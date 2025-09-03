@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="dashboardApp()" x-init="init()">
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-number" x-text="stats?.total_requests || 0">{{ stats.total_requests or 0 }}</span>
+            <div class="stat-label">Total Requests</div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-number" x-text="stats?.recent_requests || 0">{{ stats.recent_requests or 0 }}</span>
+            <div class="stat-label">Last 24 Hours</div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-number" x-text="stats?.methods ? Object.keys(stats.methods).length : 0">{{ stats.methods|length if stats.methods else 0 }}</span>
+            <div class="stat-label">HTTP Methods</div>
+        </div>
+        <div class="stat-card">
+            <span class="stat-number" x-text="campaigns?.length || 0">{{ campaigns|length if campaigns else 0 }}</span>
+            <div class="stat-label">Campaigns</div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <h3>🔍 Filters</h3>
+        <div class="filters-grid">
+            <div>
+                <label for="campaign-filter">Campaign</label>
+                <select id="campaign-filter" x-model="filters.campaign" @change="applyFilters()">
+                    <option value="">All Campaigns</option>
+                    <template x-for="campaign in campaigns" :key="campaign.id">
+                        <option :value="campaign.name" x-text="campaign.name"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div>
+                <label for="method-filter">Method</label>
+                <select id="method-filter" x-model="filters.method" @change="applyFilters()">
+                    <option value="">All Methods</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="OPTIONS">OPTIONS</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="ip-filter">IP Address</label>
+                <input type="text" id="ip-filter" x-model="filters.ip" @input="debounceFilter()" placeholder="Filter by IP...">
+            </div>
+            
+            <div>
+                <label for="ua-filter">User Agent</label>
+                <input type="text" id="ua-filter" x-model="filters.user_agent" @input="debounceFilter()" placeholder="Filter by User Agent...">
+            </div>
+            
+            <div>
+                <label for="path-filter">Path</label>
+                <input type="text" id="path-filter" x-model="filters.path" @input="debounceFilter()" placeholder="Filter by path...">
+            </div>
+            
+            <div>
+                <label for="time-range">Time Range</label>
+                <select id="time-range" x-model="filters.timeRange" @change="applyTimeFilter()">
+                    <option value="">All Time</option>
+                    <option value="1h">Last Hour</option>
+                    <option value="6h">Last 6 Hours</option>
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="export-buttons">
+            <button class="outline" @click="exportCSV()">📊 Export CSV</button>
+            <button class="outline" @click="exportJSONL()">📄 Export JSONL</button>
+            <button class="outline" @click="clearFilters()">🔄 Clear Filters</button>
+            <button class="outline" @click="toggleAutoRefresh()" 
+                    :class="autoRefresh ? 'contrast' : ''">
+                <span x-show="autoRefresh">⏸️ Pause</span>
+                <span x-show="!autoRefresh">▶️ Auto Refresh</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div x-show="errorMessage" class="error-banner" style="background: #fee; color: #c33; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem; border: 1px solid #fcc;">
+        <strong>⚠️ Error:</strong> <span x-text="errorMessage"></span>
+        <button @click="errorMessage = ''" style="float: right; background: none; border: none; color: #c33; cursor: pointer;">✕</button>
+    </div>
+
+    <!-- Loading indicator -->
+    <div x-show="loading" style="text-align: center;">
+        <div aria-busy="true">Loading...</div>
+    </div>
+
+    <!-- Logs Table -->
+    <div x-show="!loading">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>📋 Request Logs</h3>
+            <div>
+                <span x-text="`Showing ${logs.length} of ${totalLogs} requests`"></span>
+                <span x-show="lastUpdated"> (Updated: <span x-text="lastUpdated"></span>)</span>
+            </div>
+        </div>
+        
+        <div style="overflow-x: auto;">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP</th>
+                        <th>Method</th>
+                        <th>Path</th>
+                        <th>User Agent</th>
+                        <th>Campaign</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="log in logs" :key="log.id">
+                        <tr>
+                            <td x-text="formatDate(log.timestamp)"></td>
+                            <td x-text="log.ip || log.x_forwarded_for || 'Unknown'"></td>
+                            <td>
+                                <span class="method-badge" 
+                                      :class="`method-${(log.method || 'unknown').toLowerCase()}`"
+                                      x-text="log.method || 'UNKNOWN'"></span>
+                            </td>
+                            <td class="truncate" :title="log.path" x-text="log.path"></td>
+                            <td class="truncate" :title="log.user_agent" x-text="log.user_agent || 'Unknown'"></td>
+                            <td><span class="campaign-badge" x-text="log.campaign"></span></td>
+                            <td>
+                                <button class="outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" 
+                                        @click="showLogDetails(log)">
+                                    👁️ View
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Empty state -->
+        <div x-show="logs.length === 0 && !loading" style="text-align: center; padding: 2rem;">
+            <p>No logs found matching your filters.</p>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="pagination" x-show="totalPages > 1">
+            <button @click="previousPage()" :disabled="currentPage === 1">← Previous</button>
+            <span x-text="`Page ${currentPage} of ${totalPages}`"></span>
+            <button @click="nextPage()" :disabled="currentPage === totalPages">Next →</button>
+        </div>
+    </div>
+    
+    <!-- Log Detail Modal -->
+    <div class="detail-modal" x-show="selectedLog" x-transition @click.away="closeModal()" style="display: none;" :style="selectedLog ? 'display: flex !important;' : 'display: none;'">
+        <div class="modal-content" @click.stop>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3>📝 Log Details</h3>
+                <button @click="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+            </div>
+            
+            <template x-if="selectedLog">
+                <div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                        <div>
+                            <strong>Timestamp:</strong>
+                            <div x-text="formatDate(selectedLog.timestamp)"></div>
+                        </div>
+                        <div>
+                            <strong>IP Address:</strong>
+                            <div x-text="selectedLog.ip || selectedLog.x_forwarded_for || 'Unknown'"></div>
+                        </div>
+                        <div>
+                            <strong>Method:</strong>
+                            <div>
+                                <span class="method-badge" 
+                                      :class="`method-${(selectedLog.method || 'unknown').toLowerCase()}`"
+                                      x-text="selectedLog.method || 'UNKNOWN'"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Campaign:</strong>
+                            <div><span class="campaign-badge" x-text="selectedLog.campaign"></span></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Full URL:</strong>
+                        <div style="word-break: break-all;" x-text="selectedLog.url"></div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;" x-show="selectedLog.referer">
+                        <strong>Referer:</strong>
+                        <div style="word-break: break-all;" x-text="selectedLog.referer"></div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;" x-show="selectedLog.user_agent">
+                        <strong>User Agent:</strong>
+                        <div style="word-break: break-all;" x-text="selectedLog.user_agent"></div>
+                    </div>
+                    
+                    <div x-show="selectedLog.headers && typeof selectedLog.headers === 'object' && Object.keys(selectedLog.headers).length > 0">
+                        <strong>Headers:</strong>
+                        <div class="json-viewer">
+                            <pre x-text="JSON.stringify(selectedLog.headers, null, 2)"></pre>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;" x-show="selectedLog.query">
+                        <strong>Query String:</strong>
+                        <div style="word-break: break-all;" x-text="selectedLog.query"></div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;" x-show="selectedLog.accept_language">
+                        <strong>Accept Language:</strong>
+                        <div x-text="selectedLog.accept_language"></div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;" x-show="selectedLog.response_time_ms">
+                        <strong>Response Time:</strong>
+                        <div x-text="selectedLog.response_time_ms + ' ms'"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function dashboardApp() {
+    return {
+        // Data - Safe initialization with fallbacks
+        logs: (() => {
+            try {
+                return {{ logs | tojson | safe }} || [];
+            } catch (e) {
+                console.warn('Failed to parse logs data:', e);
+                return [];
+            }
+        })(),
+        campaigns: (() => {
+            try {
+                return {{ campaigns | tojson | safe }} || [];
+            } catch (e) {
+                console.warn('Failed to parse campaigns data:', e);
+                return [];
+            }
+        })(),
+        stats: (() => {
+            try {
+                return {{ stats | tojson | safe }} || {
+                    total_requests: 0,
+                    recent_requests: 0,
+                    methods: {},
+                    top_user_agents: {}
+                };
+            } catch (e) {
+                console.warn('Failed to parse stats data:', e);
+                return {
+                    total_requests: 0,
+                    recent_requests: 0,
+                    methods: {},
+                    top_user_agents: {}
+                };
+            }
+        })(),
+        
+        selectedLog: null,
+        loading: false,
+        autoRefresh: true,
+        lastUpdated: null,
+        errorMessage: '',
+        
+        // Pagination
+        currentPage: 1,
+        totalPages: 1,
+        totalLogs: 0,
+        perPage: 50,
+        
+        // Filters
+        filters: {
+            campaign: '',
+            method: '',
+            ip: '',
+            user_agent: '',
+            path: '',
+            timeRange: '',
+            startTime: '',
+            endTime: ''
+        },
+        
+        // Timers
+        debounceTimer: null,
+        refreshTimer: null,
+        
+        init() {
+            try {
+                // Initialize with proper data
+                this.totalLogs = Array.isArray(this.logs) ? this.logs.length : 0;
+                this.totalPages = Math.ceil(this.totalLogs / this.perPage) || 1;
+                this.lastUpdated = new Date().toLocaleTimeString();
+                
+                // Validate data structures
+                if (!this.stats || typeof this.stats !== 'object') {
+                    this.stats = {
+                        total_requests: 0,
+                        recent_requests: 0,
+                        methods: {},
+                        top_user_agents: {}
+                    };
+                }
+                
+                if (!Array.isArray(this.campaigns)) {
+                    this.campaigns = [];
+                }
+                
+                if (!Array.isArray(this.logs)) {
+                    this.logs = [];
+                }
+                
+                // Setup keyboard handlers
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && this.selectedLog) {
+                        this.closeModal();
+                    }
+                });
+                
+                // Start auto-refresh
+                if (this.autoRefresh) {
+                    this.startAutoRefresh();
+                }
+                
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    this.destroy();
+                });
+                
+                console.info('Dashboard initialized successfully');
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                this.errorMessage = 'Failed to initialize dashboard';
+            }
+        },
+        
+        // Utility functions
+        formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) return 'Invalid Date';
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            } catch (e) {
+                return 'Invalid Date';
+            }
+        },
+        
+        debounceFilter() {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = setTimeout(() => {
+                this.applyFilters();
+            }, 500);
+        },
+        
+        // Filter functions
+        applyFilters() {
+            this.currentPage = 1;
+            this.fetchLogs();
+        },
+        
+        applyTimeFilter() {
+            const now = new Date();
+            let startTime = '';
+            
+            switch(this.filters.timeRange) {
+                case '1h':
+                    startTime = new Date(now.getTime() - 60*60*1000).toISOString();
+                    break;
+                case '6h':
+                    startTime = new Date(now.getTime() - 6*60*60*1000).toISOString();
+                    break;
+                case '24h':
+                    startTime = new Date(now.getTime() - 24*60*60*1000).toISOString();
+                    break;
+                case '7d':
+                    startTime = new Date(now.getTime() - 7*24*60*60*1000).toISOString();
+                    break;
+                case '30d':
+                    startTime = new Date(now.getTime() - 30*24*60*60*1000).toISOString();
+                    break;
+            }
+            
+            this.filters.startTime = startTime;
+            this.applyFilters();
+        },
+        
+        clearFilters() {
+            this.filters = {
+                campaign: '',
+                method: '',
+                ip: '',
+                user_agent: '',
+                path: '',
+                timeRange: '',
+                startTime: '',
+                endTime: ''
+            };
+            this.applyFilters();
+        },
+        
+        // Data fetching
+        async fetchLogs() {
+            try {
+                this.loading = true;
+                this.errorMessage = '';
+                
+                const params = new URLSearchParams({
+                    page: this.currentPage.toString(),
+                    per_page: this.perPage.toString()
+                });
+                
+                // Add filters
+                Object.entries({
+                    campaign: this.filters.campaign,
+                    method_filter: this.filters.method,
+                    ip_filter: this.filters.ip,
+                    ua_filter: this.filters.user_agent,
+                    path_filter: this.filters.path,
+                    start_time: this.filters.startTime,
+                    end_time: this.filters.endTime
+                }).forEach(([key, value]) => {
+                    if (value && value.trim() !== '') {
+                        params.append(key, value.trim());
+                    }
+                });
+                
+                const response = await fetch(`/api/logs?${params}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Validate response data
+                if (typeof data !== 'object' || data === null) {
+                    throw new Error('Invalid response format');
+                }
+                
+                this.logs = Array.isArray(data.logs) ? data.logs : [];
+                this.totalLogs = typeof data.total === 'number' ? data.total : 0;
+                this.totalPages = typeof data.pages === 'number' ? data.pages : 1;
+                this.lastUpdated = new Date().toLocaleTimeString();
+                
+                console.info(`Fetched ${this.logs.length} logs (page ${this.currentPage})`);
+                
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+                this.errorMessage = `Error loading logs: ${error.message}`;
+                this.logs = [];
+                this.totalLogs = 0;
+                this.totalPages = 1;
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        async fetchStats() {
+            try {
+                const params = new URLSearchParams();
+                if (this.filters.campaign && this.filters.campaign.trim() !== '') {
+                    params.append('campaign', this.filters.campaign.trim());
+                }
+                
+                const response = await fetch(`/api/stats?${params}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Validate and set stats with proper defaults
+                this.stats = {
+                    total_requests: typeof data?.total_requests === 'number' ? data.total_requests : 0,
+                    recent_requests: typeof data?.recent_requests === 'number' ? data.recent_requests : 0,
+                    methods: typeof data?.methods === 'object' && data.methods !== null ? data.methods : {},
+                    top_user_agents: typeof data?.top_user_agents === 'object' && data.top_user_agents !== null ? data.top_user_agents : {}
+                };
+                
+                console.info('Stats updated successfully');
+                
+            } catch (error) {
+                console.warn('Failed to fetch stats:', error);
+                // Keep existing stats on error, don't overwrite
+            }
+        },
+        
+        // Pagination
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.fetchLogs();
+            }
+        },
+        
+        previousPage() {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.fetchLogs();
+            }
+        },
+        
+        // Export functions
+        exportCSV() {
+            const params = this.buildExportParams();
+            window.open(`/api/logs/export.csv?${params}`, '_blank');
+        },
+        
+        exportJSONL() {
+            const params = this.buildExportParams();
+            window.open(`/api/logs/export.jsonl?${params}`, '_blank');
+        },
+        
+        buildExportParams() {
+            const params = new URLSearchParams();
+            if (this.filters.campaign) params.append('campaign', this.filters.campaign);
+            if (this.filters.method) params.append('method_filter', this.filters.method);
+            if (this.filters.ip) params.append('ip_filter', this.filters.ip);
+            if (this.filters.user_agent) params.append('ua_filter', this.filters.user_agent);
+            if (this.filters.path) params.append('path_filter', this.filters.path);
+            if (this.filters.startTime) params.append('start_time', this.filters.startTime);
+            if (this.filters.endTime) params.append('end_time', this.filters.endTime);
+            return params;
+        },
+        
+        // Auto-refresh
+        toggleAutoRefresh() {
+            this.autoRefresh = !this.autoRefresh;
+            if (this.autoRefresh) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+        
+        startAutoRefresh() {
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+            }
+            this.refreshTimer = setInterval(() => {
+                if (!this.loading && !this.selectedLog) { // Don't refresh when loading or modal is open
+                    this.fetchLogs();
+                    this.fetchStats();
+                }
+            }, 10000); // Refresh every 10 seconds
+        },
+        
+        stopAutoRefresh() {
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+            }
+        },
+        
+        // Cleanup on component destroy
+        destroy() {
+            this.stopAutoRefresh();
+            if (this.debounceTimer) {
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = null;
+            }
+            document.body.style.overflow = ''; // Restore scroll
+            console.info('Dashboard cleanup completed');
+        },
+        
+        // Modal functions
+        showLogDetails(log) {
+            this.selectedLog = log;
+            // Prevent body scroll when modal is open
+            document.body.style.overflow = 'hidden';
+        },
+        
+        closeModal() {
+            this.selectedLog = null;
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+    }
+}
+</script>
+{% endblock %}

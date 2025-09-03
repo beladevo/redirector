@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirector Dashboard - Raw Mode</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 0;
+            padding: 20px;
+            background-color: #000;
+            color: #00ff00;
+        }
+        
+        .info-banner {
+            background: #002233;
+            color: #00ccff;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #00ccff;
+        }
+        
+        .header {
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stats {
+            margin-bottom: 20px;
+        }
+        
+        .filters {
+            background: #111;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        
+        .filters input, .filters select {
+            background: #000;
+            color: #00ff00;
+            border: 1px solid #333;
+            padding: 5px;
+            margin: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        th, td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #222;
+            color: #00ff00;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #111;
+        }
+        
+        .method-get { color: #00ff00; }
+        .method-post { color: #ffff00; }
+        .method-put { color: #ff8800; }
+        .method-delete { color: #ff0000; }
+        .method-other { color: #888; }
+        
+        .campaign { 
+            color: #00ffff;
+            font-weight: bold;
+        }
+        
+        a {
+            color: #00ff00;
+        }
+        
+        a:visited {
+            color: #008800;
+        }
+        
+        button {
+            background: #000;
+            color: #00ff00;
+            border: 1px solid #333;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        
+        button:hover {
+            background: #333;
+        }
+        
+        .export-section {
+            margin: 20px 0;
+            padding: 10px;
+            background: #111;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- Info Banner -->
+    <div class="info-banner">
+        📊 REDIRECTOR DASHBOARD: Professional URL redirection with comprehensive analytics and campaign tracking.
+    </div>
+    
+    <div class="header">
+        <h1>🎯 REDIRECTOR DASHBOARD - RAW MODE</h1>
+        <p>Campaign: <span class="campaign">{{ current_campaign }}</span></p>
+        <p>Status: <span style="color: #00ff00;">●</span> LIVE</p>
+    </div>
+    
+    <!-- Statistics -->
+    <div class="stats">
+        <h2>STATISTICS</h2>
+        <ul>
+            <li>Total Requests: {{ stats.total_requests }}</li>
+            <li>Recent Requests (24h): {{ stats.recent_requests }}</li>
+            <li>Active Campaigns: {{ campaigns|length }}</li>
+            <li>HTTP Methods: {{ stats.methods|length }}</li>
+        </ul>
+    </div>
+    
+    <!-- Export Section -->
+    <div class="export-section">
+        <h3>EXPORT DATA</h3>
+        <a href="/api/logs/export.csv" target="_blank">
+            <button>📊 EXPORT CSV</button>
+        </a>
+        <a href="/api/logs/export.jsonl" target="_blank">
+            <button>📄 EXPORT JSONL</button>
+        </a>
+    </div>
+    
+    <!-- Basic Filters -->
+    <div class="filters">
+        <h3>FILTERS</h3>
+        <form method="GET">
+            <label>Campaign:</label>
+            <select name="campaign">
+                <option value="">All Campaigns</option>
+                {% for campaign in campaigns %}
+                    <option value="{{ campaign.name }}">{{ campaign.name }}</option>
+                {% endfor %}
+            </select>
+            
+            <label>Method:</label>
+            <select name="method">
+                <option value="">All Methods</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+                <option value="HEAD">HEAD</option>
+                <option value="OPTIONS">OPTIONS</option>
+            </select>
+            
+            <label>IP:</label>
+            <input type="text" name="ip" placeholder="Filter by IP">
+            
+            <label>User Agent:</label>
+            <input type="text" name="ua" placeholder="Filter by UA">
+            
+            <label>Path:</label>
+            <input type="text" name="path" placeholder="Filter by path">
+            
+            <button type="submit">APPLY FILTERS</button>
+        </form>
+    </div>
+    
+    <!-- Logs Table -->
+    <h2>REQUEST LOGS ({{ logs|length }} entries)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>TIMESTAMP</th>
+                <th>IP</th>
+                <th>METHOD</th>
+                <th>PATH</th>
+                <th>USER AGENT</th>
+                <th>CAMPAIGN</th>
+                <th>DETAILS</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.id }}</td>
+                <td>{{ log.timestamp[:19] if log.timestamp else 'N/A' }}</td>
+                <td>{{ log.ip or log.x_forwarded_for or 'Unknown' }}</td>
+                <td class="method-{{ (log.method | lower) if log.method else 'other' }}">
+                    {{ log.method or 'UNKNOWN' }}
+                </td>
+                <td>{{ log.path or '/' }}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                    {{ log.user_agent[:50] + '...' if log.user_agent and log.user_agent|length > 50 else (log.user_agent or 'Unknown') }}
+                </td>
+                <td class="campaign">{{ log.campaign }}</td>
+                <td>
+                    <a href="/logs/{{ log.id }}" target="_blank">VIEW</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if logs|length == 0 %}
+    <p style="text-align: center; padding: 40px; color: #888;">
+        NO LOGS FOUND MATCHING CURRENT FILTERS
+    </p>
+    {% endif %}
+    
+    <!-- Auto-refresh script -->
+    <script>
+        // Auto-refresh every 30 seconds in raw mode
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+        
+        // Show a simple indicator
+        setInterval(function() {
+            document.title = document.title.includes('●') ? 
+                'Redirector Dashboard - Raw Mode' : 
+                '● Redirector Dashboard - Raw Mode';
+        }, 1000);
+    </script>
+</body>
+</html>

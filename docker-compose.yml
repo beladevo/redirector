@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  redirector:
+    build: .
+    container_name: redirector-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # Redirect server
+      - "3000:3000"  # Dashboard
+    environment:
+      - REDIRECT_URL=https://example.com
+      - CAMPAIGN=docker-demo
+      - DATABASE_PATH=/app/data/logs.db
+      - LOG_LEVEL=info
+    volumes:
+      - ./data:/app/data  # Persist database
+      - ./logs:/app/logs  # Persist logs
+    command: >
+      python -m redirector.cli.main run
+      --redirect https://example.com
+      --redirect-port 8080
+      --dashboard-port 3000
+      --campaign docker-demo
+      --database /app/data/logs.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Cloudflare tunnel sidecar
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: redirector-tunnel
+    restart: unless-stopped
+    profiles:
+      - tunnel  # Use: docker-compose --profile tunnel up
+    command: tunnel --url http://redirector:8080
+    depends_on:
+      - redirector
+
+  # Optional: Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    container_name: redirector-nginx
+    restart: unless-stopped
+    profiles:
+      - production
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl:ro
+    depends_on:
+      - redirector
+
+volumes:
+  data:
+    driver: local
+  logs:
+    driver: local

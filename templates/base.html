@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Redirector Dashboard{% endblock %}</title>
+    
+    <!-- Pico.css for beautiful, minimal styling -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    
+    <!-- Custom styles -->
+    <style>
+        :root {
+            --pico-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        }
+        
+        .info-banner {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+            border-left: 4px solid #2c5aa0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--pico-card-background-color);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--pico-card-border-color);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--pico-primary);
+            display: block;
+        }
+        
+        .stat-label {
+            color: var(--pico-muted-color);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        
+        .filters-section {
+            background: var(--pico-card-background-color);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--pico-card-border-color);
+            margin-bottom: 2rem;
+        }
+        
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .log-table th,
+        .log-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--pico-table-border-color);
+        }
+        
+        .log-table th {
+            background-color: var(--pico-table-row-stripped-background-color);
+            font-weight: 600;
+        }
+        
+        .log-table tr:hover {
+            background-color: var(--pico-table-row-stripped-background-color);
+        }
+        
+        .method-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .method-get { background: #e3f2fd; color: #1976d2; }
+        .method-post { background: #f3e5f5; color: #7b1fa2; }
+        .method-put { background: #fff3e0; color: #f57c00; }
+        .method-delete { background: #ffebee; color: #d32f2f; }
+        .method-other { background: #f5f5f5; color: #424242; }
+        
+        .truncate {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 2rem;
+        }
+        
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .campaign-badge {
+            background: var(--pico-primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .detail-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--pico-card-background-color);
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .json-viewer {
+            background: var(--pico-code-background-color);
+            padding: 1rem;
+            border-radius: 0.25rem;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .export-buttons {
+                justify-content: center;
+            }
+        }
+    </style>
+    
+    <!-- Alpine.js for interactivity -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Info Banner -->
+    <div class="info-banner">
+        <strong>📊 REDIRECTOR DASHBOARD:</strong> Professional URL redirection with comprehensive analytics and campaign tracking.
+    </div>
+    
+    <main class="container">
+        <header>
+            <nav>
+                <ul>
+                    <li><strong>🎯 Redirector Dashboard</strong></li>
+                </ul>
+                <ul>
+                    <li><span class="live-indicator"></span>Live</li>
+                    <li>Campaign: <span class="campaign-badge">{{ current_campaign }}</span></li>
+                </ul>
+            </nav>
+        </header>
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

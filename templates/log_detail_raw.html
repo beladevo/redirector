@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Details {{ log.id }} - Raw Mode</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 0;
+            padding: 20px;
+            background-color: #000;
+            color: #00ff00;
+        }
+        
+        .info-banner {
+            background: #002233;
+            color: #00ccff;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #00ccff;
+        }
+        
+        .header {
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            background: #111;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        
+        .field {
+            margin-bottom: 10px;
+        }
+        
+        .field-name {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        .field-value {
+            margin-left: 20px;
+            word-break: break-all;
+        }
+        
+        .method-get { color: #00ff00; }
+        .method-post { color: #ffff00; }
+        .method-put { color: #ff8800; }
+        .method-delete { color: #ff0000; }
+        .method-other { color: #888; }
+        
+        .campaign { 
+            color: #00ffff;
+            font-weight: bold;
+        }
+        
+        a {
+            color: #00ff00;
+        }
+        
+        a:visited {
+            color: #008800;
+        }
+        
+        pre {
+            background: #222;
+            padding: 10px;
+            border: 1px solid #333;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Info Banner -->
+    <div class="info-banner">
+        📊 REDIRECTOR DASHBOARD: Professional URL redirection with comprehensive analytics and campaign tracking.
+    </div>
+    
+    <div class="header">
+        <h1>📝 LOG ENTRY DETAILS - {{ log.id }}</h1>
+        <p><a href="/">← BACK TO DASHBOARD</a></p>
+    </div>
+    
+    <!-- Basic Information -->
+    <div class="section">
+        <h2>BASIC INFORMATION</h2>
+        
+        <div class="field">
+            <span class="field-name">ID:</span>
+            <div class="field-value">{{ log.id }}</div>
+        </div>
+        
+        <div class="field">
+            <span class="field-name">TIMESTAMP:</span>
+            <div class="field-value">{{ log.timestamp[:19] if log.timestamp else 'N/A' }}</div>
+        </div>
+        
+        <div class="field">
+            <span class="field-name">IP ADDRESS:</span>
+            <div class="field-value">{{ log.ip or 'Unknown' }}</div>
+        </div>
+        
+        {% if log.x_forwarded_for %}
+        <div class="field">
+            <span class="field-name">X-FORWARDED-FOR:</span>
+            <div class="field-value">{{ log.x_forwarded_for }}</div>
+        </div>
+        {% endif %}
+        
+        <div class="field">
+            <span class="field-name">METHOD:</span>
+            <div class="field-value">
+                <span class="method-{{ (log.method | lower) if log.method else 'other' }}">
+                    {{ log.method or 'UNKNOWN' }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="field">
+            <span class="field-name">CAMPAIGN:</span>
+            <div class="field-value campaign">{{ log.campaign }}</div>
+        </div>
+        
+        {% if log.response_time_ms %}
+        <div class="field">
+            <span class="field-name">RESPONSE TIME:</span>
+            <div class="field-value">{{ log.response_time_ms }} ms</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- URL Information -->
+    <div class="section">
+        <h2>REQUEST INFORMATION</h2>
+        
+        <div class="field">
+            <span class="field-name">FULL URL:</span>
+            <div class="field-value">{{ log.url }}</div>
+        </div>
+        
+        {% if log.path %}
+        <div class="field">
+            <span class="field-name">PATH:</span>
+            <div class="field-value">{{ log.path }}</div>
+        </div>
+        {% endif %}
+        
+        {% if log.query %}
+        <div class="field">
+            <span class="field-name">QUERY STRING:</span>
+            <div class="field-value">{{ log.query }}</div>
+        </div>
+        {% endif %}
+        
+        {% if log.referer %}
+        <div class="field">
+            <span class="field-name">REFERER:</span>
+            <div class="field-value">{{ log.referer }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Client Information -->
+    <div class="section">
+        <h2>CLIENT INFORMATION</h2>
+        
+        {% if log.user_agent %}
+        <div class="field">
+            <span class="field-name">USER AGENT:</span>
+            <div class="field-value">{{ log.user_agent }}</div>
+        </div>
+        {% endif %}
+        
+        {% if log.accept_language %}
+        <div class="field">
+            <span class="field-name">ACCEPT LANGUAGE:</span>
+            <div class="field-value">{{ log.accept_language }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Headers -->
+    {% if log.headers %}
+    <div class="section">
+        <h2>REQUEST HEADERS</h2>
+        <pre>{{ log.headers | pprint if log.headers is mapping else log.headers }}</pre>
+    </div>
+    {% endif %}
+    
+    <!-- Body Information -->
+    {% if log.body_digest or log.has_body %}
+    <div class="section">
+        <h2>REQUEST BODY</h2>
+        
+        {% if log.body_digest %}
+        <div class="field">
+            <span class="field-name">BODY SHA256:</span>
+            <div class="field-value">{{ log.body_digest }}</div>
+        </div>
+        {% endif %}
+        
+        <div class="field">
+            <span class="field-name">BODY STORAGE:</span>
+            <div class="field-value">
+                {% if log.has_body %}
+                    STORED
+                {% else %}
+                    NOT STORED
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="section">
+        <p><a href="/">← BACK TO DASHBOARD</a></p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Log Details - {{ log.id }}{% endblock %}
+
+{% block content %}
+<div>
+    <div style="margin-bottom: 2rem;">
+        <a href="/" style="text-decoration: none;">← Back to Dashboard</a>
+    </div>
+    
+    <h2>📝 Log Entry Details</h2>
+    
+    <!-- Basic Information -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="stat-card">
+            <strong>ID</strong>
+            <div style="font-size: 1.2rem; margin-top: 0.5rem;">{{ log.id }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <strong>Timestamp</strong>
+            <div style="font-size: 1.2rem; margin-top: 0.5rem;">{{ log.timestamp[:19] if log.timestamp else 'N/A' }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <strong>IP Address</strong>
+            <div style="font-size: 1.2rem; margin-top: 0.5rem;">{{ log.ip or log.x_forwarded_for or 'Unknown' }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <strong>Method</strong>
+            <div style="margin-top: 0.5rem;">
+                <span class="method-badge method-{{ (log.method | lower) if log.method else 'other' }}">
+                    {{ log.method or 'UNKNOWN' }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <strong>Campaign</strong>
+            <div style="margin-top: 0.5rem;">
+                <span class="campaign-badge">{{ log.campaign }}</span>
+            </div>
+        </div>
+        
+        {% if log.response_time_ms %}
+        <div class="stat-card">
+            <strong>Response Time</strong>
+            <div style="font-size: 1.2rem; margin-top: 0.5rem;">{{ log.response_time_ms }} ms</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- URL Information -->
+    <div class="filters-section">
+        <h3>🔗 Request Information</h3>
+        
+        <div style="margin-bottom: 1rem;">
+            <strong>Full URL:</strong>
+            <div style="word-break: break-all; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.url }}
+            </div>
+        </div>
+        
+        {% if log.path %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Path:</strong>
+            <div style="word-break: break-all; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.path }}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if log.query %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Query String:</strong>
+            <div style="word-break: break-all; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.query }}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if log.referer %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Referer:</strong>
+            <div style="word-break: break-all; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.referer }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Client Information -->
+    <div class="filters-section">
+        <h3>🖥️ Client Information</h3>
+        
+        {% if log.user_agent %}
+        <div style="margin-bottom: 1rem;">
+            <strong>User Agent:</strong>
+            <div style="word-break: break-all; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.user_agent }}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if log.accept_language %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Accept Language:</strong>
+            <div style="background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.accept_language }}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if log.x_forwarded_for %}
+        <div style="margin-bottom: 1rem;">
+            <strong>X-Forwarded-For:</strong>
+            <div style="background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.x_forwarded_for }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Headers -->
+    {% if log.headers %}
+    <div class="filters-section">
+        <h3>📋 Request Headers</h3>
+        <div class="json-viewer">
+            <pre>{{ log.headers | pprint if log.headers is mapping else log.headers }}</pre>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Body Information -->
+    {% if log.body_digest or log.has_body %}
+    <div class="filters-section">
+        <h3>📄 Request Body</h3>
+        
+        {% if log.body_digest %}
+        <div style="margin-bottom: 1rem;">
+            <strong>Body SHA256:</strong>
+            <div style="font-family: monospace; background: var(--pico-code-background-color); padding: 1rem; border-radius: 0.25rem; margin-top: 0.5rem;">
+                {{ log.body_digest }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div>
+            <strong>Body Storage:</strong>
+            <span style="margin-left: 0.5rem;">
+                {% if log.has_body %}
+                    <span style="color: var(--pico-primary);">✅ Stored</span>
+                {% else %}
+                    <span style="color: var(--pico-muted-color);">❌ Not stored</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
