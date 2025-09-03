@@ -1,146 +1,404 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="dashboardApp()" x-init="init()">
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <span class="stat-number" x-text="stats?.total_requests || 0">{{ stats.total_requests or 0 }}</span>
-            <div class="stat-label">Total Requests</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number" x-text="stats?.recent_requests || 0">{{ stats.recent_requests or 0 }}</span>
-            <div class="stat-label">Last 24 Hours</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number" x-text="stats?.methods ? Object.keys(stats.methods).length : 0">{{ stats.methods|length if stats.methods else 0 }}</span>
-            <div class="stat-label">HTTP Methods</div>
-        </div>
-        <div class="stat-card">
-            <span class="stat-number" x-text="campaigns?.length || 0">{{ campaigns|length if campaigns else 0 }}</span>
-            <div class="stat-label">Campaigns</div>
-        </div>
-    </div>
-
-    <!-- Filters Section -->
-    <div class="filters-section">
-        <h3>🔍 Filters</h3>
-        <div class="filters-grid">
-            <div>
-                <label for="campaign-filter">Campaign</label>
-                <select id="campaign-filter" x-model="filters.campaign" @change="applyFilters()">
-                    <option value="">All Campaigns</option>
-                    <template x-for="campaign in campaigns" :key="campaign.id">
-                        <option :value="campaign.name" x-text="campaign.name"></option>
-                    </template>
-                </select>
-            </div>
-            
-            <div>
-                <label for="method-filter">Method</label>
-                <select id="method-filter" x-model="filters.method" @change="applyFilters()">
-                    <option value="">All Methods</option>
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
-                    <option value="DELETE">DELETE</option>
-                    <option value="PATCH">PATCH</option>
-                    <option value="HEAD">HEAD</option>
-                    <option value="OPTIONS">OPTIONS</option>
-                </select>
-            </div>
-            
-            <div>
-                <label for="ip-filter">IP Address</label>
-                <input type="text" id="ip-filter" x-model="filters.ip" @input="debounceFilter()" placeholder="Filter by IP...">
-            </div>
-            
-            <div>
-                <label for="ua-filter">User Agent</label>
-                <input type="text" id="ua-filter" x-model="filters.user_agent" @input="debounceFilter()" placeholder="Filter by User Agent...">
-            </div>
-            
-            <div>
-                <label for="path-filter">Path</label>
-                <input type="text" id="path-filter" x-model="filters.path" @input="debounceFilter()" placeholder="Filter by path...">
-            </div>
-            
-            <div>
-                <label for="time-range">Time Range</label>
-                <select id="time-range" x-model="filters.timeRange" @change="applyTimeFilter()">
-                    <option value="">All Time</option>
-                    <option value="1h">Last Hour</option>
-                    <option value="6h">Last 6 Hours</option>
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                    <option value="30d">Last 30 Days</option>
-                </select>
+<!-- Modern Dashboard Application -->
+<div x-data="dashboardApp()" x-init="initialize()" class="space-y-6">
+    <!-- Campaign Cards Section -->
+    <section class="campaign-cards-section" aria-label="Campaign Overview">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-900">
+                📊 Campaign Overview
+            </h2>
+            <div class="text-sm text-gray-600" x-show="campaignCards.length > 0">
+                Showing <span x-text="campaignCards.length"></span> of <span x-text="campaignCardsPagination.totalItems"></span> campaigns
             </div>
         </div>
         
-        <div class="export-buttons">
-            <button class="outline" @click="exportCSV()">📊 Export CSV</button>
-            <button class="outline" @click="exportJSONL()">📄 Export JSONL</button>
-            <button class="outline" @click="clearFilters()">🔄 Clear Filters</button>
-            <button class="outline" @click="toggleAutoRefresh()" 
-                    :class="autoRefresh ? 'contrast' : ''">
-                <span x-show="autoRefresh">⏸️ Pause</span>
-                <span x-show="!autoRefresh">▶️ Auto Refresh</span>
+        <!-- Campaign Cards Grid -->
+        <div class="campaign-cards-grid" x-show="!loadingCampaignCards && campaignCards.length > 0">
+            <template x-for="card in campaignCards" :key="card.id">
+                <div 
+                    class="campaign-card"
+                    @click="filterByCampaign(card.name)"
+                    :class="{ 'active': filters.campaign === card.name }"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="`View logs for campaign ${card.name}`"
+                    @keydown.enter="filterByCampaign(card.name)"
+                    @keydown.space.prevent="filterByCampaign(card.name)"
+                >
+                    <div class="campaign-card-header">
+                        <h3 class="campaign-card-title" x-text="card.name"></h3>
+                        <div class="campaign-card-status" :class="{ 'active': card.is_active }">
+                            <span x-show="card.is_active" class="text-green-600">●</span>
+                            <span x-show="!card.is_active" class="text-gray-400">●</span>
+                        </div>
+                    </div>
+                    
+                    <p class="campaign-card-description" x-text="card.description || 'No description'"></p>
+                    
+                    <div class="campaign-card-stats">
+                        <div class="stat-item">
+                            <div class="stat-value" x-text="formatNumber(card.request_count)"></div>
+                            <div class="stat-label">Total Requests</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" x-text="formatNumber(card.recent_count)"></div>
+                            <div class="stat-label">Last 24h</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tunnel Info -->
+                    <div x-show="card.tunnel_requests > 0" class="campaign-card-tunnel">
+                        <div class="tunnel-badge">
+                            🌍 <span x-text="card.tunnel_percentage + '%'"></span> via tunnel
+                        </div>
+                        <div x-show="card.tunnel_url" class="tunnel-url" x-text="card.tunnel_url"></div>
+                    </div>
+                    
+                    <!-- Top Methods -->
+                    <div x-show="card.top_methods && card.top_methods.length > 0" class="campaign-card-methods">
+                        <div class="methods-label">Top Methods:</div>
+                        <div class="methods-list">
+                            <template x-for="method in card.top_methods.slice(0, 3)" :key="method.method">
+                                <span class="method-tag" x-text="`${method.method} (${method.count})`"></span>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <div class="campaign-card-footer">
+                        <div class="last-activity" x-show="card.latest_request">
+                            Last activity: <span x-text="formatTimestamp(card.latest_request)"></span>
+                        </div>
+                        <div x-show="!card.latest_request" class="text-gray-500">No requests yet</div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Campaign Cards Pagination -->
+        <div x-show="campaignCardsPagination.totalPages > 1" class="campaign-cards-pagination">
+            <button 
+                @click="loadCampaignCards(campaignCardsPagination.currentPage - 1)" 
+                :disabled="campaignCardsPagination.currentPage === 1 || loadingCampaignCards"
+                class="btn btn-outline"
+            >
+                ← Previous
             </button>
+            
+            <span class="pagination-info">
+                Page <span x-text="campaignCardsPagination.currentPage"></span> of 
+                <span x-text="campaignCardsPagination.totalPages"></span>
+            </span>
+            
+            <button 
+                @click="loadCampaignCards(campaignCardsPagination.currentPage + 1)" 
+                :disabled="campaignCardsPagination.currentPage >= campaignCardsPagination.totalPages || loadingCampaignCards"
+                class="btn btn-outline"
+            >
+                Next →
+            </button>
+        </div>
+        
+        <!-- Loading State for Campaign Cards -->
+        <div x-show="loadingCampaignCards" class="loading-container">
+            <div class="loading-spinner"></div>
+            <span>Loading campaigns...</span>
+        </div>
+        
+        <!-- Empty State for Campaign Cards -->
+        <div x-show="!loadingCampaignCards && campaignCards.length === 0" class="empty-state">
+            <div class="text-6xl mb-4">📊</div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No campaigns found</h3>
+            <p class="text-gray-600">Start redirecting traffic to create your first campaign.</p>
+        </div>
+        
+        <!-- Show More Button -->
+        <div x-show="campaignCards.length < campaignCardsPagination.totalItems && !loadingCampaignCards" class="text-center mt-4">
+            <button 
+                @click="loadMoreCampaignCards()"
+                class="btn btn-outline"
+            >
+                See More Campaigns
+            </button>
+        </div>
+    </section>
+
+    <!-- Error Alert -->
+    <div x-show="errorState.hasError" x-transition class="alert alert-error">
+        <div class="flex-1">
+            <strong>⚠️ Error:</strong>
+            <span x-text="errorState.message"></span>
+        </div>
+        <button @click="clearError()" class="alert-close" aria-label="Close error">
+            <span aria-hidden="true">×</span>
+        </button>
+    </div>
+
+    <!-- Success Alert -->
+    <div x-show="successMessage" x-transition class="alert alert-success">
+        <div class="flex-1">
+            <strong>✅ Success:</strong>
+            <span x-text="successMessage"></span>
+        </div>
+        <button @click="successMessage = null" class="alert-close" aria-label="Close success message">
+            <span aria-hidden="true">×</span>
+        </button>
+    </div>
+
+    <!-- Filters Card -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">
+                <span>🔍</span>
+                <span>Filters & Controls</span>
+            </h2>
+        </div>
+        <div class="card-content">
+            <form @submit.prevent="handleFilterSubmit()" class="space-y-4">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="campaign-filter" class="form-label">Campaign</label>
+                        <select 
+                            id="campaign-filter" 
+                            x-model="filters.campaign" 
+                            @change="debounceFilter()"
+                            class="form-select"
+                        >
+                            <option value="">All Campaigns</option>
+                            <template x-for="campaign in campaigns" :key="campaign.id || campaign.name">
+                                <option :value="campaign.name" x-text="campaign.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="method-filter" class="form-label">HTTP Method</label>
+                        <select 
+                            id="method-filter" 
+                            x-model="filters.method" 
+                            @change="debounceFilter()"
+                            class="form-select"
+                        >
+                            <option value="">All Methods</option>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="HEAD">HEAD</option>
+                            <option value="OPTIONS">OPTIONS</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ip-filter" class="form-label">IP Address</label>
+                        <input 
+                            type="text" 
+                            id="ip-filter" 
+                            x-model="filters.ip" 
+                            @input="debounceFilter()" 
+                            placeholder="Filter by IP address..."
+                            class="form-input"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="ua-filter" class="form-label">User Agent</label>
+                        <input 
+                            type="text" 
+                            id="ua-filter" 
+                            x-model="filters.userAgent" 
+                            @input="debounceFilter()" 
+                            placeholder="Filter by user agent..."
+                            class="form-input"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="path-filter" class="form-label">Request Path</label>
+                        <input 
+                            type="text" 
+                            id="path-filter" 
+                            x-model="filters.path" 
+                            @input="debounceFilter()" 
+                            placeholder="Filter by request path..."
+                            class="form-input"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="time-range" class="form-label">Time Range</label>
+                        <select 
+                            id="time-range" 
+                            x-model="filters.timeRange" 
+                            @change="handleTimeRangeChange()"
+                            class="form-select"
+                        >
+                            <option value="">All Time</option>
+                            <option value="1h">Last Hour</option>
+                            <option value="6h">Last 6 Hours</option>
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <button 
+                        type="button"
+                        @click="exportData('csv')" 
+                        :disabled="loading"
+                        class="btn btn-outline"
+                    >
+                        <span>📊</span>
+                        <span>Export CSV</span>
+                    </button>
+                    
+                    <button 
+                        type="button"
+                        @click="exportData('jsonl')" 
+                        :disabled="loading"
+                        class="btn btn-outline"
+                    >
+                        <span>📄</span>
+                        <span>Export JSONL</span>
+                    </button>
+                    
+                    <button 
+                        type="button"
+                        @click="clearAllFilters()" 
+                        :disabled="loading"
+                        class="btn btn-outline"
+                    >
+                        <span>🔄</span>
+                        <span>Clear Filters</span>
+                    </button>
+                    
+                    <button 
+                        type="button"
+                        @click="toggleAutoRefresh()" 
+                        :class="autoRefresh.enabled ? 'btn btn-primary' : 'btn btn-outline'"
+                        :disabled="loading"
+                    >
+                        <span x-show="autoRefresh.enabled">⏸️</span>
+                        <span x-show="!autoRefresh.enabled">▶️</span>
+                        <span x-text="autoRefresh.enabled ? 'Pause Refresh' : 'Auto Refresh'"></span>
+                    </button>
+                    
+                    <button 
+                        type="button"
+                        @click="refreshData()" 
+                        :disabled="loading"
+                        class="btn btn-outline"
+                    >
+                        <div x-show="loading" class="loading-spinner"></div>
+                        <span x-show="!loading">🔄</span>
+                        <span x-text="loading ? 'Loading...' : 'Refresh'"></span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <!-- Error Message -->
-    <div x-show="errorMessage" class="error-banner" style="background: #fee; color: #c33; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem; border: 1px solid #fcc;">
-        <strong>⚠️ Error:</strong> <span x-text="errorMessage"></span>
-        <button @click="errorMessage = ''" style="float: right; background: none; border: none; color: #c33; cursor: pointer;">✕</button>
-    </div>
-
-    <!-- Loading indicator -->
-    <div x-show="loading" style="text-align: center;">
-        <div aria-busy="true">Loading...</div>
+    <!-- Loading State -->
+    <div x-show="loading && logs.length === 0" class="loading-container">
+        <div class="loading-spinner"></div>
+        <span>Loading dashboard data...</span>
     </div>
 
     <!-- Logs Table -->
-    <div x-show="!loading">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3>📋 Request Logs</h3>
-            <div>
-                <span x-text="`Showing ${logs.length} of ${totalLogs} requests`"></span>
-                <span x-show="lastUpdated"> (Updated: <span x-text="lastUpdated"></span>)</span>
+    <div x-show="!loading || logs.length > 0" class="card">
+        <div class="card-header">
+            <div class="flex justify-between items-center w-full">
+                <h2 class="card-title">
+                    <span>📋</span>
+                    <span>Request Logs</span>
+                </h2>
+                <div class="text-sm text-gray-600">
+                    <span x-text="`Showing ${logs.length} of ${totalLogs} requests`"></span>
+                    <span x-show="lastUpdated" class="ml-2">
+                        (Updated: <span x-text="lastUpdated"></span>)
+                    </span>
+                </div>
             </div>
         </div>
         
-        <div style="overflow-x: auto;">
-            <table class="log-table">
+        <div class="table-container">
+            <table class="table">
                 <thead>
                     <tr>
-                        <th>Time</th>
-                        <th>IP</th>
-                        <th>Method</th>
-                        <th>Path</th>
-                        <th>User Agent</th>
-                        <th>Campaign</th>
-                        <th>Actions</th>
+                        <th scope="col">Timestamp</th>
+                        <th scope="col">IP Address</th>
+                        <th scope="col">Method</th>
+                        <th scope="col">Path</th>
+                        <th scope="col">User Agent</th>
+                        <th scope="col">Campaign</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template x-for="log in logs" :key="log.id">
                         <tr>
-                            <td x-text="formatDate(log.timestamp)"></td>
-                            <td x-text="log.ip || log.x_forwarded_for || 'Unknown'"></td>
                             <td>
-                                <span class="method-badge" 
-                                      :class="`method-${(log.method || 'unknown').toLowerCase()}`"
-                                      x-text="log.method || 'UNKNOWN'"></span>
+                                <time :datetime="log.timestamp" x-text="formatTimestamp(log.timestamp)"></time>
                             </td>
-                            <td class="truncate" :title="log.path" x-text="log.path"></td>
-                            <td class="truncate" :title="log.user_agent" x-text="log.user_agent || 'Unknown'"></td>
-                            <td><span class="campaign-badge" x-text="log.campaign"></span></td>
+                            <td x-text="getDisplayIP(log)"></td>
                             <td>
-                                <button class="outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" 
-                                        @click="showLogDetails(log)">
-                                    👁️ View
+                                <span 
+                                    class="method-badge" 
+                                    :class="`method-${getMethodClass(log.method)}`"
+                                    x-text="log.method || 'UNKNOWN'"
+                                ></span>
+                            </td>
+                            <td>
+                                <span 
+                                    class="truncate" 
+                                    :title="log.path"
+                                    x-text="log.path || '/'"
+                                ></span>
+                            </td>
+                            <td>
+                                <span 
+                                    class="truncate" 
+                                    :title="log.user_agent"
+                                    x-text="truncateText(log.user_agent || 'Unknown', 30)"
+                                ></span>
+                            </td>
+                            <td>
+                                <span 
+                                    class="campaign-badge text-xs" 
+                                    x-text="log.campaign || 'default'"
+                                ></span>
+                            </td>
+                            <td>
+                                <div class="source-indicator">
+                                    <span 
+                                        x-show="log.via_tunnel" 
+                                        class="tunnel-badge-small" 
+                                        title="Request came through tunnel"
+                                    >
+                                        🌍 Tunnel
+                                    </span>
+                                    <span 
+                                        x-show="!log.via_tunnel" 
+                                        class="direct-badge-small"
+                                        title="Direct request"
+                                    >
+                                        🔗 Direct
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <button 
+                                    @click="openLogDetails(log)" 
+                                    class="btn btn-outline btn-sm"
+                                    :aria-label="`View details for log ${log.id}`"
+                                >
+                                    <span>👁️</span>
+                                    <span class="sr-only">View Details</span>
                                 </button>
                             </td>
                         </tr>
@@ -149,347 +407,1111 @@
             </table>
         </div>
         
-        <!-- Empty state -->
-        <div x-show="logs.length === 0 && !loading" style="text-align: center; padding: 2rem;">
-            <p>No logs found matching your filters.</p>
+        <!-- Empty State -->
+        <div x-show="logs.length === 0 && !loading" class="text-center py-12">
+            <div class="text-6xl mb-4">📭</div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No logs found</h3>
+            <p class="text-gray-600 mb-4">
+                <span x-show="hasActiveFilters()">No logs match your current filters.</span>
+                <span x-show="!hasActiveFilters()">No requests have been logged yet.</span>
+            </p>
+            <button 
+                x-show="hasActiveFilters()" 
+                @click="clearAllFilters()"
+                class="btn btn-outline"
+            >
+                Clear Filters
+            </button>
         </div>
         
         <!-- Pagination -->
-        <div class="pagination" x-show="totalPages > 1">
-            <button @click="previousPage()" :disabled="currentPage === 1">← Previous</button>
-            <span x-text="`Page ${currentPage} of ${totalPages}`"></span>
-            <button @click="nextPage()" :disabled="currentPage === totalPages">Next →</button>
+        <div x-show="pagination.totalPages > 1" class="flex justify-center items-center gap-4 p-4 border-t">
+            <button 
+                @click="goToPage(pagination.currentPage - 1)" 
+                :disabled="pagination.currentPage === 1 || loading"
+                class="btn btn-outline"
+            >
+                ← Previous
+            </button>
+            
+            <span class="text-sm text-gray-600">
+                Page <span x-text="pagination.currentPage"></span> of 
+                <span x-text="pagination.totalPages"></span>
+            </span>
+            
+            <button 
+                @click="goToPage(pagination.currentPage + 1)" 
+                :disabled="pagination.currentPage >= pagination.totalPages || loading"
+                class="btn btn-outline"
+            >
+                Next →
+            </button>
         </div>
     </div>
-    
+
     <!-- Log Detail Modal -->
-    <div class="detail-modal" x-show="selectedLog" x-transition @click.away="closeModal()" style="display: none;" :style="selectedLog ? 'display: flex !important;' : 'display: none;'">
-        <div class="modal-content" @click.stop>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3>📝 Log Details</h3>
-                <button @click="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+    <div 
+        x-show="selectedLog" 
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="closeLogDetails()"
+        @keydown.escape="closeLogDetails()"
+        class="modal-overlay"
+        style="display: none;"
+    >
+        <div 
+            @click.stop
+            class="modal-content"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 transform scale-95"
+            x-transition:enter-end="opacity-100 transform scale-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 transform scale-100"
+            x-transition:leave-end="opacity-0 transform scale-95"
+        >
+            <div class="modal-header">
+                <h3 class="modal-title">📝 Log Details</h3>
+                <button @click="closeLogDetails()" class="modal-close" aria-label="Close modal">
+                    <span aria-hidden="true">×</span>
+                </button>
             </div>
             
-            <template x-if="selectedLog">
-                <div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-                        <div>
-                            <strong>Timestamp:</strong>
-                            <div x-text="formatDate(selectedLog.timestamp)"></div>
-                        </div>
-                        <div>
-                            <strong>IP Address:</strong>
-                            <div x-text="selectedLog.ip || selectedLog.x_forwarded_for || 'Unknown'"></div>
-                        </div>
-                        <div>
-                            <strong>Method:</strong>
-                            <div>
-                                <span class="method-badge" 
-                                      :class="`method-${(selectedLog.method || 'unknown').toLowerCase()}`"
-                                      x-text="selectedLog.method || 'UNKNOWN'"></span>
-                            </div>
-                        </div>
-                        <div>
-                            <strong>Campaign:</strong>
-                            <div><span class="campaign-badge" x-text="selectedLog.campaign"></span></div>
-                        </div>
+            <div class="modal-body" x-show="selectedLog">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Timestamp</h4>
+                        <p x-text="formatTimestamp(selectedLog?.timestamp, true)"></p>
                     </div>
                     
-                    <div style="margin-bottom: 1rem;">
-                        <strong>Full URL:</strong>
-                        <div style="word-break: break-all;" x-text="selectedLog.url"></div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">IP Address</h4>
+                        <p x-text="getDisplayIP(selectedLog)"></p>
                     </div>
                     
-                    <div style="margin-bottom: 1rem;" x-show="selectedLog.referer">
-                        <strong>Referer:</strong>
-                        <div style="word-break: break-all;" x-text="selectedLog.referer"></div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">HTTP Method</h4>
+                        <span 
+                            class="method-badge" 
+                            :class="`method-${getMethodClass(selectedLog?.method)}`"
+                            x-text="selectedLog?.method || 'UNKNOWN'"
+                        ></span>
                     </div>
                     
-                    <div style="margin-bottom: 1rem;" x-show="selectedLog.user_agent">
-                        <strong>User Agent:</strong>
-                        <div style="word-break: break-all;" x-text="selectedLog.user_agent"></div>
-                    </div>
-                    
-                    <div x-show="selectedLog.headers && typeof selectedLog.headers === 'object' && Object.keys(selectedLog.headers).length > 0">
-                        <strong>Headers:</strong>
-                        <div class="json-viewer">
-                            <pre x-text="JSON.stringify(selectedLog.headers, null, 2)"></pre>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1rem;" x-show="selectedLog.query">
-                        <strong>Query String:</strong>
-                        <div style="word-break: break-all;" x-text="selectedLog.query"></div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1rem;" x-show="selectedLog.accept_language">
-                        <strong>Accept Language:</strong>
-                        <div x-text="selectedLog.accept_language"></div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1rem;" x-show="selectedLog.response_time_ms">
-                        <strong>Response Time:</strong>
-                        <div x-text="selectedLog.response_time_ms + ' ms'"></div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Campaign</h4>
+                        <span class="campaign-badge text-sm" x-text="selectedLog?.campaign || 'default'"></span>
                     </div>
                 </div>
-            </template>
+                
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Full URL</h4>
+                        <p class="break-all bg-gray-50 p-3 rounded text-sm font-mono" x-text="selectedLog?.url"></p>
+                    </div>
+                    
+                    <div x-show="selectedLog?.referer">
+                        <h4 class="font-semibold text-gray-900 mb-2">Referer</h4>
+                        <p class="break-all bg-gray-50 p-3 rounded text-sm font-mono" x-text="selectedLog?.referer"></p>
+                    </div>
+                    
+                    <div x-show="selectedLog?.user_agent">
+                        <h4 class="font-semibold text-gray-900 mb-2">User Agent</h4>
+                        <p class="break-all bg-gray-50 p-3 rounded text-sm font-mono" x-text="selectedLog?.user_agent"></p>
+                    </div>
+                    
+                    <div x-show="selectedLog?.headers && Object.keys(selectedLog.headers).length > 0">
+                        <h4 class="font-semibold text-gray-900 mb-2">Request Headers</h4>
+                        <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="formatJSON(selectedLog?.headers)"></pre>
+                    </div>
+                    
+                    <div x-show="selectedLog?.query">
+                        <h4 class="font-semibold text-gray-900 mb-2">Query Parameters</h4>
+                        <p class="break-all bg-gray-50 p-3 rounded text-sm font-mono" x-text="selectedLog?.query"></p>
+                    </div>
+                    
+                    <div x-show="selectedLog?.response_time_ms">
+                        <h4 class="font-semibold text-gray-900 mb-2">Response Time</h4>
+                        <p><span x-text="selectedLog?.response_time_ms"></span> ms</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
+/**
+ * Modern Dashboard Application
+ * Built with Alpine.js 3.x and ES6+ features
+ * 
+ * @author Dashboard Team
+ * @version 2.0.0
+ */
+
+/**
+ * Dashboard application state and methods
+ * @returns {Object} Alpine.js data object
+ */
 function dashboardApp() {
     return {
-        // Data - Safe initialization with fallbacks
-        logs: (() => {
-            try {
-                return {{ logs | tojson | safe }} || [];
-            } catch (e) {
-                console.warn('Failed to parse logs data:', e);
-                return [];
-            }
-        })(),
-        campaigns: (() => {
-            try {
-                return {{ campaigns | tojson | safe }} || [];
-            } catch (e) {
-                console.warn('Failed to parse campaigns data:', e);
-                return [];
-            }
-        })(),
-        stats: (() => {
-            try {
-                return {{ stats | tojson | safe }} || {
-                    total_requests: 0,
-                    recent_requests: 0,
-                    methods: {},
-                    top_user_agents: {}
-                };
-            } catch (e) {
-                console.warn('Failed to parse stats data:', e);
-                return {
-                    total_requests: 0,
-                    recent_requests: 0,
-                    methods: {},
-                    top_user_agents: {}
-                };
-            }
-        })(),
+        // ==================== STATE ====================
         
+        /** @type {Array<Object>} Current log entries */
+        logs: [],
+        
+        /** @type {Array<Object>} Available campaigns */
+        campaigns: [],
+        
+        /** @type {Array<Object>} Campaign cards with metadata */
+        campaignCards: [],
+        
+        /** @type {boolean} Loading state for campaign cards */
+        loadingCampaignCards: false,
+        
+        /** @type {Object} Dashboard statistics */
+        stats: {
+            totalRequests: 0,
+            recentRequests: 0,
+            methodCount: 0,
+            topUserAgents: {}
+        },
+        
+        /** @type {Object|null} Currently selected log for detail view */
         selectedLog: null,
+        
+        /** @type {boolean} Loading state indicator */
         loading: false,
-        autoRefresh: true,
+        
+        /** @type {Object} Error state management */
+        errorState: {
+            hasError: false,
+            message: '',
+            code: null
+        },
+        
+        /** @type {string|null} Success message */
+        successMessage: null,
+        
+        /** @type {string|null} Last update timestamp */
         lastUpdated: null,
-        errorMessage: '',
         
-        // Pagination
-        currentPage: 1,
-        totalPages: 1,
-        totalLogs: 0,
-        perPage: 50,
+        // ==================== FILTERS ====================
         
-        // Filters
+        /** @type {Object} Current filter values */
         filters: {
             campaign: '',
             method: '',
             ip: '',
-            user_agent: '',
+            userAgent: '',
             path: '',
             timeRange: '',
             startTime: '',
             endTime: ''
         },
         
-        // Timers
-        debounceTimer: null,
-        refreshTimer: null,
+        // ==================== PAGINATION ====================
         
-        init() {
+        /** @type {Object} Pagination state */
+        pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            perPage: 50,
+            totalItems: 0
+        },
+        
+        /** @type {Object} Campaign cards pagination state */
+        campaignCardsPagination: {
+            currentPage: 1,
+            totalPages: 1,
+            perPage: 20,
+            totalItems: 0
+        },
+        
+        // ==================== AUTO REFRESH ====================
+        
+        /** @type {Object} Auto refresh configuration */
+        autoRefresh: {
+            enabled: true,
+            interval: 5000, // 5 seconds - faster updates
+            timerId: null
+        },
+        
+        // ==================== REAL-TIME UPDATES ====================
+        
+        /** @type {Object} Real-time update configuration */
+        realTime: {
+            websocket: null,
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            reconnectDelay: 3000,
+            heartbeatInterval: null
+        },
+        
+        // ==================== INTERNAL STATE ====================
+        
+        /** @type {number|null} Debounce timer for filters */
+        _debounceTimer: null,
+        
+        /** @type {AbortController|null} Current fetch abort controller */
+        _abortController: null,
+        
+        // ==================== INITIALIZATION ====================
+        
+        /**
+         * Initialize the dashboard application
+         */
+        async initialize() {
             try {
-                // Initialize with proper data
-                this.totalLogs = Array.isArray(this.logs) ? this.logs.length : 0;
-                this.totalPages = Math.ceil(this.totalLogs / this.perPage) || 1;
-                this.lastUpdated = new Date().toLocaleTimeString();
+                console.info('🚀 Initializing Redirector Dashboard v2.0.0');
                 
-                // Validate data structures
-                if (!this.stats || typeof this.stats !== 'object') {
-                    this.stats = {
-                        total_requests: 0,
-                        recent_requests: 0,
-                        methods: {},
-                        top_user_agents: {}
-                    };
+                // Initialize data from server-side rendering
+                await this._initializeServerData();
+                
+                // Set up event listeners
+                this._setupEventListeners();
+                
+                // Load initial data
+                await this.loadInitialData();
+                
+                // Load campaign cards
+                await this.loadCampaignCards();
+                
+                // Initialize real-time updates
+                this._initializeRealTime();
+                
+                // Start auto refresh if enabled (fallback for WebSocket failures)
+                if (this.autoRefresh.enabled) {
+                    this._startAutoRefresh();
                 }
                 
-                if (!Array.isArray(this.campaigns)) {
-                    this.campaigns = [];
-                }
-                
-                if (!Array.isArray(this.logs)) {
-                    this.logs = [];
-                }
-                
-                // Setup keyboard handlers
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape' && this.selectedLog) {
-                        this.closeModal();
-                    }
-                });
-                
-                // Start auto-refresh
-                if (this.autoRefresh) {
-                    this.startAutoRefresh();
-                }
-                
-                // Cleanup on page unload
-                window.addEventListener('beforeunload', () => {
-                    this.destroy();
-                });
-                
-                console.info('Dashboard initialized successfully');
-            } catch (error) {
-                console.error('Error initializing dashboard:', error);
-                this.errorMessage = 'Failed to initialize dashboard';
-            }
-        },
-        
-        // Utility functions
-        formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            try {
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) return 'Invalid Date';
-                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-            } catch (e) {
-                return 'Invalid Date';
-            }
-        },
-        
-        debounceFilter() {
-            clearTimeout(this.debounceTimer);
-            this.debounceTimer = setTimeout(() => {
-                this.applyFilters();
-            }, 500);
-        },
-        
-        // Filter functions
-        applyFilters() {
-            this.currentPage = 1;
-            this.fetchLogs();
-        },
-        
-        applyTimeFilter() {
-            const now = new Date();
-            let startTime = '';
-            
-            switch(this.filters.timeRange) {
-                case '1h':
-                    startTime = new Date(now.getTime() - 60*60*1000).toISOString();
-                    break;
-                case '6h':
-                    startTime = new Date(now.getTime() - 6*60*60*1000).toISOString();
-                    break;
-                case '24h':
-                    startTime = new Date(now.getTime() - 24*60*60*1000).toISOString();
-                    break;
-                case '7d':
-                    startTime = new Date(now.getTime() - 7*24*60*60*1000).toISOString();
-                    break;
-                case '30d':
-                    startTime = new Date(now.getTime() - 30*24*60*60*1000).toISOString();
-                    break;
-            }
-            
-            this.filters.startTime = startTime;
-            this.applyFilters();
-        },
-        
-        clearFilters() {
-            this.filters = {
-                campaign: '',
-                method: '',
-                ip: '',
-                user_agent: '',
-                path: '',
-                timeRange: '',
-                startTime: '',
-                endTime: ''
-            };
-            this.applyFilters();
-        },
-        
-        // Data fetching
-        async fetchLogs() {
-            try {
-                this.loading = true;
-                this.errorMessage = '';
-                
-                const params = new URLSearchParams({
-                    page: this.currentPage.toString(),
-                    per_page: this.perPage.toString()
-                });
-                
-                // Add filters
-                Object.entries({
-                    campaign: this.filters.campaign,
-                    method_filter: this.filters.method,
-                    ip_filter: this.filters.ip,
-                    ua_filter: this.filters.user_agent,
-                    path_filter: this.filters.path,
-                    start_time: this.filters.startTime,
-                    end_time: this.filters.endTime
-                }).forEach(([key, value]) => {
-                    if (value && value.trim() !== '') {
-                        params.append(key, value.trim());
-                    }
-                });
-                
-                const response = await fetch(`/api/logs?${params}`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                
-                // Validate response data
-                if (typeof data !== 'object' || data === null) {
-                    throw new Error('Invalid response format');
-                }
-                
-                this.logs = Array.isArray(data.logs) ? data.logs : [];
-                this.totalLogs = typeof data.total === 'number' ? data.total : 0;
-                this.totalPages = typeof data.pages === 'number' ? data.pages : 1;
-                this.lastUpdated = new Date().toLocaleTimeString();
-                
-                console.info(`Fetched ${this.logs.length} logs (page ${this.currentPage})`);
+                console.info('✅ Dashboard initialized successfully');
                 
             } catch (error) {
-                console.error('Failed to fetch logs:', error);
-                this.errorMessage = `Error loading logs: ${error.message}`;
+                console.error('❌ Failed to initialize dashboard:', error);
+                this._handleError('Failed to initialize dashboard', error);
+            }
+        },
+        
+        /**
+         * Initialize data from server-side rendering
+         * @private
+         */
+        async _initializeServerData() {
+            try {
+                // Safely parse server-side data with fallbacks
+                this.logs = this._parseServerData({{ logs | tojson | safe }}, []);
+                this.campaigns = this._parseServerData({{ campaigns | tojson | safe }}, []);
+                const serverStats = this._parseServerData({{ stats | tojson | safe }}, {});
+                
+                this.stats = {
+                    totalRequests: serverStats.total_requests || 0,
+                    recentRequests: serverStats.recent_requests || 0,
+                    methodCount: serverStats.methods ? Object.keys(serverStats.methods).length : 0,
+                    topUserAgents: serverStats.top_user_agents || {}
+                };
+                
+                this.pagination.totalItems = this.logs.length;
+                this.pagination.totalPages = Math.ceil(this.pagination.totalItems / this.pagination.perPage) || 1;
+                
+            } catch (error) {
+                console.warn('⚠️ Failed to parse server data, using defaults:', error);
                 this.logs = [];
-                this.totalLogs = 0;
-                this.totalPages = 1;
+                this.campaigns = [];
+                this.stats = { totalRequests: 0, recentRequests: 0, methodCount: 0, topUserAgents: {} };
+            }
+        },
+        
+        /**
+         * Parse server data safely
+         * @private
+         * @param {any} data - Data to parse
+         * @param {any} fallback - Fallback value
+         * @returns {any} Parsed data or fallback
+         */
+        _parseServerData(data, fallback) {
+            if (data === null || data === undefined) return fallback;
+            return Array.isArray(data) || typeof data === 'object' ? data : fallback;
+        },
+        
+        /**
+         * Set up global event listeners
+         * @private
+         */
+        _setupEventListeners() {
+            // Handle page unload cleanup
+            window.addEventListener('beforeunload', () => {
+                this._cleanup();
+            });
+            
+            // Handle keyboard shortcuts
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && this.selectedLog) {
+                    this.closeLogDetails();
+                }
+                
+                // Ctrl/Cmd + R for refresh
+                if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+                    event.preventDefault();
+                    this.refreshData();
+                }
+            });
+            
+            // Handle visibility change for auto-refresh
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this._pauseAutoRefresh();
+                } else if (this.autoRefresh.enabled) {
+                    this._startAutoRefresh();
+                }
+            });
+        },
+        
+        // ==================== DATA LOADING ====================
+        
+        /**
+         * Load initial dashboard data
+         */
+        async loadInitialData() {
+            this.loading = true;
+            this.clearError();
+            
+            try {
+                await Promise.all([
+                    this._fetchLogs(),
+                    this._fetchStats()
+                ]);
+                
+                this.lastUpdated = this.formatTimestamp(new Date().toISOString());
+                
+            } catch (error) {
+                this._handleError('Failed to load dashboard data', error);
             } finally {
                 this.loading = false;
             }
         },
         
-        async fetchStats() {
+        /**
+         * Refresh all dashboard data
+         */
+        async refreshData() {
+            await this.loadInitialData();
+            this.showSuccessMessage('Dashboard data refreshed successfully');
+        },
+        
+        /**
+         * Fetch logs from API
+         * @private
+         */
+        async _fetchLogs() {
+            // Cancel any existing request
+            if (this._abortController) {
+                this._abortController.abort();
+            }
+            
+            this._abortController = new AbortController();
+            
+            const params = new URLSearchParams({
+                page: this.pagination.currentPage.toString(),
+                per_page: this.pagination.perPage.toString()
+            });
+            
+            // Add filters to params
+            this._addFiltersToParams(params);
+            
+            const response = await fetch(`/api/logs?${params}`, {
+                signal: this._abortController.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            this.logs = Array.isArray(data.logs) ? data.logs : [];
+            this.pagination.totalItems = typeof data.total === 'number' ? data.total : 0;
+            this.pagination.totalPages = typeof data.pages === 'number' ? data.pages : 1;
+            
+            console.info(`📊 Fetched ${this.logs.length} logs (page ${this.pagination.currentPage})`);
+        },
+        
+        /**
+         * Fetch statistics from API
+         * @private
+         */
+        async _fetchStats() {
+            const params = new URLSearchParams();
+            
+            if (this.filters.campaign) {
+                params.append('campaign', this.filters.campaign);
+            }
+            
+            const response = await fetch(`/api/stats?${params}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            this.stats = {
+                totalRequests: data.total_requests || 0,
+                recentRequests: data.recent_requests || 0,
+                methodCount: data.methods ? Object.keys(data.methods).length : 0,
+                topUserAgents: data.top_user_agents || {}
+            };
+        },
+        
+        /**
+         * Add current filters to URL params
+         * @private
+         * @param {URLSearchParams} params - URL search params object
+         */
+        _addFiltersToParams(params) {
+            const filterMap = {
+                campaign: 'campaign',
+                method: 'method_filter',
+                ip: 'ip_filter',
+                userAgent: 'ua_filter',
+                path: 'path_filter',
+                startTime: 'start_time',
+                endTime: 'end_time'
+            };
+            
+            Object.entries(filterMap).forEach(([filterKey, paramKey]) => {
+                const value = this.filters[filterKey];
+                if (value && value.trim()) {
+                    params.append(paramKey, value.trim());
+                }
+            });
+        },
+        
+        // ==================== FILTER MANAGEMENT ====================
+        
+        /**
+         * Handle form submission (prevent default)
+         */
+        handleFilterSubmit() {
+            // Form submission is handled by input events
+            console.info('Filter form submitted (handled by reactive filters)');
+        },
+        
+        /**
+         * Debounced filter application
+         */
+        debounceFilter() {
+            if (this._debounceTimer) {
+                clearTimeout(this._debounceTimer);
+            }
+            
+            this._debounceTimer = setTimeout(() => {
+                this.applyFilters();
+            }, 300);
+        },
+        
+        /**
+         * Apply current filters
+         */
+        async applyFilters() {
+            console.info('🔍 Applying filters:', this.filters);
+            
+            this.pagination.currentPage = 1; // Reset to first page
+            await this.loadInitialData();
+        },
+        
+        /**
+         * Handle time range filter change
+         */
+        handleTimeRangeChange() {
+            const now = new Date();
+            let startTime = '';
+            
+            const timeRangeMap = {
+                '1h': 60 * 60 * 1000,
+                '6h': 6 * 60 * 60 * 1000,
+                '24h': 24 * 60 * 60 * 1000,
+                '7d': 7 * 24 * 60 * 60 * 1000,
+                '30d': 30 * 24 * 60 * 60 * 1000
+            };
+            
+            if (this.filters.timeRange && timeRangeMap[this.filters.timeRange]) {
+                const milliseconds = timeRangeMap[this.filters.timeRange];
+                startTime = new Date(now.getTime() - milliseconds).toISOString();
+            }
+            
+            this.filters.startTime = startTime;
+            this.filters.endTime = ''; // Clear end time when using preset ranges
+            
+            this.debounceFilter();
+        },
+        
+        /**
+         * Clear all filters
+         */
+        clearAllFilters() {
+            console.info('🧹 Clearing all filters');
+            
+            this.filters = {
+                campaign: '',
+                method: '',
+                ip: '',
+                userAgent: '',
+                path: '',
+                timeRange: '',
+                startTime: '',
+                endTime: ''
+            };
+            
+            this.debounceFilter();
+        },
+        
+        /**
+         * Check if any filters are currently active
+         * @returns {boolean} True if filters are active
+         */
+        hasActiveFilters() {
+            return Object.values(this.filters).some(value => value && value.trim());
+        },
+        
+        // ==================== PAGINATION ====================
+        
+        /**
+         * Navigate to specific page
+         * @param {number} page - Page number to navigate to
+         */
+        async goToPage(page) {
+            if (page < 1 || page > this.pagination.totalPages || page === this.pagination.currentPage) {
+                return;
+            }
+            
+            console.info(`📄 Navigating to page ${page}`);
+            
+            this.pagination.currentPage = page;
+            await this.loadInitialData();
+        },
+        
+        // ==================== EXPORT FUNCTIONALITY ====================
+        
+        /**
+         * Export data in specified format
+         * @param {'csv'|'jsonl'} format - Export format
+         */
+        async exportData(format) {
             try {
+                console.info(`📤 Exporting data as ${format.toUpperCase()}`);
+                
                 const params = new URLSearchParams();
-                if (this.filters.campaign && this.filters.campaign.trim() !== '') {
-                    params.append('campaign', this.filters.campaign.trim());
+                this._addFiltersToParams(params);
+                
+                const url = `/api/logs/export.${format}?${params}`;
+                
+                // Create temporary download link
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `redirector_logs_${new Date().toISOString().split('T')[0]}.${format}`;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                this.showSuccessMessage(`Data exported as ${format.toUpperCase()} successfully`);
+                
+            } catch (error) {
+                console.error(`❌ Failed to export ${format}:`, error);
+                this._handleError(`Failed to export data as ${format.toUpperCase()}`, error);
+            }
+        },
+        
+        // ==================== AUTO REFRESH ====================
+        
+        /**
+         * Toggle auto refresh on/off
+         */
+        toggleAutoRefresh() {
+            this.autoRefresh.enabled = !this.autoRefresh.enabled;
+            
+            if (this.autoRefresh.enabled) {
+                this._startAutoRefresh();
+                console.info('🔄 Auto refresh enabled');
+            } else {
+                this._pauseAutoRefresh();
+                console.info('⏸️ Auto refresh paused');
+            }
+        },
+        
+        /**
+         * Start auto refresh timer
+         * @private
+         */
+        _startAutoRefresh() {
+            this._pauseAutoRefresh(); // Clear any existing timer
+            
+            if (!this.autoRefresh.enabled) return;
+            
+            this.autoRefresh.timerId = setInterval(async () => {
+                if (!this.loading && !this.selectedLog && !document.hidden) {
+                    try {
+                        await this.loadInitialData();
+                        console.info('🔄 Auto refresh completed');
+                    } catch (error) {
+                        console.warn('⚠️ Auto refresh failed:', error);
+                    }
+                }
+            }, this.autoRefresh.interval);
+        },
+        
+        /**
+         * Pause auto refresh timer
+         * @private
+         */
+        _pauseAutoRefresh() {
+            if (this.autoRefresh.timerId) {
+                clearInterval(this.autoRefresh.timerId);
+                this.autoRefresh.timerId = null;
+            }
+        },
+        
+        // ==================== REAL-TIME UPDATES ====================
+        
+        /**
+         * Initialize real-time WebSocket connection
+         * @private
+         */
+        _initializeRealTime() {
+            try {
+                // Try to establish WebSocket connection for real-time updates
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/api/ws/logs`;
+                
+                this._connectWebSocket(wsUrl);
+                
+            } catch (error) {
+                console.warn('⚠️ WebSocket not available, falling back to polling:', error);
+                // Auto-refresh will handle updates as fallback
+            }
+        },
+        
+        /**
+         * Connect to WebSocket
+         * @private
+         * @param {string} url - WebSocket URL
+         */
+        _connectWebSocket(url) {
+            try {
+                this.realTime.websocket = new WebSocket(url);
+                
+                this.realTime.websocket.onopen = () => {
+                    console.info('🔌 WebSocket connected - Real-time updates enabled');
+                    this.realTime.reconnectAttempts = 0;
+                    
+                    // Send current filter state to server
+                    this._sendWebSocketMessage({
+                        type: 'subscribe',
+                        filters: this.filters
+                    });
+                    
+                    // Start heartbeat
+                    this._startWebSocketHeartbeat();
+                };
+                
+                this.realTime.websocket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this._handleWebSocketMessage(data);
+                    } catch (error) {
+                        console.warn('Failed to parse WebSocket message:', error);
+                    }
+                };
+                
+                this.realTime.websocket.onclose = (event) => {
+                    console.warn('🔌 WebSocket disconnected:', event.code, event.reason);
+                    this._handleWebSocketDisconnect();
+                };
+                
+                this.realTime.websocket.onerror = (error) => {
+                    console.error('🔌 WebSocket error:', error);
+                };
+                
+            } catch (error) {
+                console.warn('Failed to create WebSocket connection:', error);
+                this._handleWebSocketDisconnect();
+            }
+        },
+        
+        /**
+         * Handle WebSocket messages
+         * @private
+         * @param {Object} data - Message data
+         */
+        _handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'new_log':
+                    this._handleNewLogEntry(data.log);
+                    break;
+                    
+                case 'stats_update':
+                    this._handleStatsUpdate(data.stats);
+                    break;
+                    
+                case 'bulk_update':
+                    // Full data refresh via WebSocket
+                    if (data.logs) this.logs = data.logs;
+                    if (data.stats) this._handleStatsUpdate(data.stats);
+                    this.lastUpdated = this.formatTimestamp(new Date().toISOString());
+                    console.info('📊 Bulk update received via WebSocket');
+                    break;
+                    
+                case 'pong':
+                    // Heartbeat response
+                    break;
+                    
+                default:
+                    console.warn('Unknown WebSocket message type:', data.type);
+            }
+        },
+        
+        /**
+         * Handle new log entry from WebSocket
+         * @private
+         * @param {Object} log - New log entry
+         */
+        _handleNewLogEntry(log) {
+            // Add new log to the beginning of the list
+            this.logs.unshift(log);
+            
+            // Keep only the latest entries (prevent memory bloat)
+            if (this.logs.length > this.pagination.perPage * 2) {
+                this.logs = this.logs.slice(0, this.pagination.perPage);
+            }
+            
+            // Update pagination info
+            this.pagination.totalItems++;
+            
+            console.info('📝 New log entry received:', log.id);
+            
+            // Optional: Show brief notification for new entries
+            this._showBriefNotification(`New ${log.method} request from ${this.getDisplayIP(log)}`);
+        },
+        
+        /**
+         * Handle stats update from WebSocket
+         * @private
+         * @param {Object} stats - Updated statistics
+         */
+        _handleStatsUpdate(stats) {
+            this.stats = {
+                totalRequests: stats.total_requests || this.stats.totalRequests,
+                recentRequests: stats.recent_requests || this.stats.recentRequests,
+                methodCount: stats.methods ? Object.keys(stats.methods).length : this.stats.methodCount,
+                topUserAgents: stats.top_user_agents || this.stats.topUserAgents
+            };
+        },
+        
+        /**
+         * Send message to WebSocket
+         * @private
+         * @param {Object} message - Message to send
+         */
+        _sendWebSocketMessage(message) {
+            if (this.realTime.websocket && this.realTime.websocket.readyState === WebSocket.OPEN) {
+                try {
+                    this.realTime.websocket.send(JSON.stringify(message));
+                } catch (error) {
+                    console.warn('Failed to send WebSocket message:', error);
+                }
+            }
+        },
+        
+        /**
+         * Start WebSocket heartbeat
+         * @private
+         */
+        _startWebSocketHeartbeat() {
+            this._stopWebSocketHeartbeat();
+            
+            this.realTime.heartbeatInterval = setInterval(() => {
+                this._sendWebSocketMessage({ type: 'ping' });
+            }, 30000); // Send ping every 30 seconds
+        },
+        
+        /**
+         * Stop WebSocket heartbeat
+         * @private
+         */
+        _stopWebSocketHeartbeat() {
+            if (this.realTime.heartbeatInterval) {
+                clearInterval(this.realTime.heartbeatInterval);
+                this.realTime.heartbeatInterval = null;
+            }
+        },
+        
+        /**
+         * Handle WebSocket disconnect
+         * @private
+         */
+        _handleWebSocketDisconnect() {
+            this._stopWebSocketHeartbeat();
+            
+            // Attempt to reconnect if under retry limit
+            if (this.realTime.reconnectAttempts < this.realTime.maxReconnectAttempts) {
+                this.realTime.reconnectAttempts++;
+                
+                console.info(`🔄 Attempting WebSocket reconnect (${this.realTime.reconnectAttempts}/${this.realTime.maxReconnectAttempts})`);
+                
+                setTimeout(() => {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}/api/ws/logs`;
+                    this._connectWebSocket(wsUrl);
+                }, this.realTime.reconnectDelay);
+                
+            } else {
+                console.warn('🔌 Max WebSocket reconnection attempts reached, using polling fallback');
+                
+                // Ensure auto-refresh is enabled as fallback
+                if (!this.autoRefresh.enabled) {
+                    this.autoRefresh.enabled = true;
+                    this._startAutoRefresh();
+                }
+            }
+        },
+        
+        /**
+         * Show brief notification (non-intrusive)
+         * @private
+         * @param {string} message - Notification message
+         */
+        _showBriefNotification(message) {
+            // Create a small, non-intrusive notification
+            const notification = document.createElement('div');
+            notification.className = 'brief-notification';
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--primary-600);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 0.875rem;
+                z-index: 1001;
+                opacity: 0;
+                transform: translateY(-10px);
+                transition: all 0.3s ease;
+                pointer-events: none;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                notification.style.opacity = '1';
+                notification.style.transform = 'translateY(0)';
+            });
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        },
+        
+        // ==================== MODAL MANAGEMENT ====================
+        
+        /**
+         * Open log details modal
+         * @param {Object} log - Log entry to display
+         */
+        openLogDetails(log) {
+            console.info('👁️ Opening log details for ID:', log.id);
+            
+            this.selectedLog = log;
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+        },
+        
+        /**
+         * Close log details modal
+         */
+        closeLogDetails() {
+            console.info('❌ Closing log details modal');
+            
+            this.selectedLog = null;
+            document.body.style.overflow = ''; // Restore scroll
+        },
+        
+        // ==================== ERROR HANDLING ====================
+        
+        /**
+         * Handle application errors
+         * @private
+         * @param {string} message - Error message
+         * @param {Error} error - Error object
+         */
+        _handleError(message, error) {
+            console.error('❌', message, error);
+            
+            this.errorState = {
+                hasError: true,
+                message: message,
+                code: error.name || 'UnknownError'
+            };
+            
+            // Auto clear error after 10 seconds
+            setTimeout(() => {
+                this.clearError();
+            }, 10000);
+        },
+        
+        /**
+         * Clear current error state
+         */
+        clearError() {
+            this.errorState = {
+                hasError: false,
+                message: '',
+                code: null
+            };
+        },
+        
+        /**
+         * Show success message
+         * @param {string} message - Success message
+         */
+        showSuccessMessage(message) {
+            this.successMessage = message;
+            
+            // Auto clear success message after 5 seconds
+            setTimeout(() => {
+                this.successMessage = null;
+            }, 5000);
+        },
+        
+        // ==================== UTILITY FUNCTIONS ====================
+        
+        /**
+         * Format number with thousand separators
+         * @param {number} num - Number to format
+         * @returns {string} Formatted number
+         */
+        formatNumber(num) {
+            if (typeof num !== 'number') return '0';
+            return num.toLocaleString();
+        },
+        
+        /**
+         * Format timestamp for display
+         * @param {string} timestamp - ISO timestamp string
+         * @param {boolean} includeSeconds - Include seconds in output
+         * @returns {string} Formatted timestamp
+         */
+        formatTimestamp(timestamp, includeSeconds = false) {
+            if (!timestamp) return 'N/A';
+            
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) return 'Invalid Date';
+                
+                const options = {
+                    year: 'numeric',
+                    month: 'short',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                };
+                
+                if (includeSeconds) {
+                    options.second = '2-digit';
                 }
                 
-                const response = await fetch(`/api/stats?${params}`, {
-                    method: 'GET',
+                return date.toLocaleString(undefined, options);
+            } catch (error) {
+                console.warn('Failed to format timestamp:', timestamp, error);
+                return 'Invalid Date';
+            }
+        },
+        
+        /**
+         * Get display IP address (prefer forwarded IP)
+         * @param {Object} log - Log entry
+         * @returns {string} IP address
+         */
+        getDisplayIP(log) {
+            if (!log) return 'Unknown';
+            return log.x_forwarded_for || log.ip || 'Unknown';
+        },
+        
+        /**
+         * Get CSS class for HTTP method
+         * @param {string} method - HTTP method
+         * @returns {string} CSS class name
+         */
+        getMethodClass(method) {
+            if (!method) return 'unknown';
+            return method.toLowerCase();
+        },
+        
+        /**
+         * Truncate text to specified length
+         * @param {string} text - Text to truncate
+         * @param {number} length - Maximum length
+         * @returns {string} Truncated text
+         */
+        truncateText(text, length = 50) {
+            if (!text || text.length <= length) return text;
+            return text.substring(0, length) + '...';
+        },
+        
+        /**
+         * Format JSON for display
+         * @param {Object} obj - Object to format
+         * @returns {string} Formatted JSON string
+         */
+        formatJSON(obj) {
+            if (!obj) return '';
+            try {
+                return JSON.stringify(obj, null, 2);
+            } catch (error) {
+                console.warn('Failed to format JSON:', error);
+                return String(obj);
+            }
+        },
+        
+        // ==================== CAMPAIGN CARDS ====================
+        
+        /**
+         * Load campaign cards
+         * @param {number} page - Page number to load
+         */
+        async loadCampaignCards(page = 1) {
+            this.loadingCampaignCards = true;
+            this.clearError();
+            
+            try {
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    per_page: this.campaignCardsPagination.perPage.toString()
+                });
+                
+                const response = await fetch(`/api/campaign-cards?${params}`, {
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
@@ -502,113 +1524,113 @@ function dashboardApp() {
                 
                 const data = await response.json();
                 
-                // Validate and set stats with proper defaults
-                this.stats = {
-                    total_requests: typeof data?.total_requests === 'number' ? data.total_requests : 0,
-                    recent_requests: typeof data?.recent_requests === 'number' ? data.recent_requests : 0,
-                    methods: typeof data?.methods === 'object' && data.methods !== null ? data.methods : {},
-                    top_user_agents: typeof data?.top_user_agents === 'object' && data.top_user_agents !== null ? data.top_user_agents : {}
-                };
+                this.campaignCards = data.campaign_cards || [];
+                this.campaignCardsPagination.currentPage = data.page || 1;
+                this.campaignCardsPagination.totalPages = data.pages || 1;
+                this.campaignCardsPagination.totalItems = data.total || 0;
                 
-                console.info('Stats updated successfully');
+                console.info(`📊 Loaded ${this.campaignCards.length} campaign cards (page ${this.campaignCardsPagination.currentPage})`);
                 
             } catch (error) {
-                console.warn('Failed to fetch stats:', error);
-                // Keep existing stats on error, don't overwrite
+                this._handleError('Failed to load campaign cards', error);
+            } finally {
+                this.loadingCampaignCards = false;
             }
         },
         
-        // Pagination
-        nextPage() {
-            if (this.currentPage < this.totalPages) {
-                this.currentPage++;
-                this.fetchLogs();
+        /**
+         * Load more campaign cards (append to existing)
+         */
+        async loadMoreCampaignCards() {
+            if (this.campaignCardsPagination.currentPage >= this.campaignCardsPagination.totalPages) {
+                return;
             }
-        },
-        
-        previousPage() {
-            if (this.currentPage > 1) {
-                this.currentPage--;
-                this.fetchLogs();
-            }
-        },
-        
-        // Export functions
-        exportCSV() {
-            const params = this.buildExportParams();
-            window.open(`/api/logs/export.csv?${params}`, '_blank');
-        },
-        
-        exportJSONL() {
-            const params = this.buildExportParams();
-            window.open(`/api/logs/export.jsonl?${params}`, '_blank');
-        },
-        
-        buildExportParams() {
-            const params = new URLSearchParams();
-            if (this.filters.campaign) params.append('campaign', this.filters.campaign);
-            if (this.filters.method) params.append('method_filter', this.filters.method);
-            if (this.filters.ip) params.append('ip_filter', this.filters.ip);
-            if (this.filters.user_agent) params.append('ua_filter', this.filters.user_agent);
-            if (this.filters.path) params.append('path_filter', this.filters.path);
-            if (this.filters.startTime) params.append('start_time', this.filters.startTime);
-            if (this.filters.endTime) params.append('end_time', this.filters.endTime);
-            return params;
-        },
-        
-        // Auto-refresh
-        toggleAutoRefresh() {
-            this.autoRefresh = !this.autoRefresh;
-            if (this.autoRefresh) {
-                this.startAutoRefresh();
-            } else {
-                this.stopAutoRefresh();
-            }
-        },
-        
-        startAutoRefresh() {
-            if (this.refreshTimer) {
-                clearInterval(this.refreshTimer);
-            }
-            this.refreshTimer = setInterval(() => {
-                if (!this.loading && !this.selectedLog) { // Don't refresh when loading or modal is open
-                    this.fetchLogs();
-                    this.fetchStats();
+            
+            const nextPage = this.campaignCardsPagination.currentPage + 1;
+            this.loadingCampaignCards = true;
+            
+            try {
+                const params = new URLSearchParams({
+                    page: nextPage.toString(),
+                    per_page: this.campaignCardsPagination.perPage.toString()
+                });
+                
+                const response = await fetch(`/api/campaign-cards?${params}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-            }, 10000); // Refresh every 10 seconds
-        },
-        
-        stopAutoRefresh() {
-            if (this.refreshTimer) {
-                clearInterval(this.refreshTimer);
-                this.refreshTimer = null;
+                
+                const data = await response.json();
+                
+                // Append new cards to existing ones
+                this.campaignCards.push(...(data.campaign_cards || []));
+                this.campaignCardsPagination.currentPage = data.page || nextPage;
+                this.campaignCardsPagination.totalPages = data.pages || this.campaignCardsPagination.totalPages;
+                this.campaignCardsPagination.totalItems = data.total || this.campaignCardsPagination.totalItems;
+                
+                console.info(`📊 Loaded ${data.campaign_cards?.length || 0} more campaign cards`);
+                
+            } catch (error) {
+                this._handleError('Failed to load more campaign cards', error);
+            } finally {
+                this.loadingCampaignCards = false;
             }
         },
         
-        // Cleanup on component destroy
-        destroy() {
-            this.stopAutoRefresh();
-            if (this.debounceTimer) {
-                clearTimeout(this.debounceTimer);
-                this.debounceTimer = null;
+        /**
+         * Filter logs by campaign (from campaign card click)
+         * @param {string} campaignName - Campaign to filter by
+         */
+        filterByCampaign(campaignName) {
+            console.info(`🎯 Filtering logs by campaign: ${campaignName}`);
+            
+            this.filters.campaign = campaignName;
+            this.debounceFilter();
+        },
+        
+        // ==================== CLEANUP ====================
+        
+        /**
+         * Clean up resources when component is destroyed
+         * @private
+         */
+        _cleanup() {
+            console.info('🧹 Cleaning up dashboard resources');
+            
+            this._pauseAutoRefresh();
+            this._stopWebSocketHeartbeat();
+            
+            // Close WebSocket connection
+            if (this.realTime.websocket) {
+                this.realTime.websocket.close();
+                this.realTime.websocket = null;
             }
+            
+            if (this._debounceTimer) {
+                clearTimeout(this._debounceTimer);
+                this._debounceTimer = null;
+            }
+            
+            if (this._abortController) {
+                this._abortController.abort();
+                this._abortController = null;
+            }
+            
             document.body.style.overflow = ''; // Restore scroll
-            console.info('Dashboard cleanup completed');
-        },
-        
-        // Modal functions
-        showLogDetails(log) {
-            this.selectedLog = log;
-            // Prevent body scroll when modal is open
-            document.body.style.overflow = 'hidden';
-        },
-        
-        closeModal() {
-            this.selectedLog = null;
-            // Restore body scroll
-            document.body.style.overflow = '';
         }
-    }
+    };
 }
+
+// Initialize when Alpine.js is ready
+document.addEventListener('alpine:init', () => {
+    console.info('🏔️ Alpine.js initialized for Redirector Dashboard');
+});
+
 </script>
 {% endblock %}

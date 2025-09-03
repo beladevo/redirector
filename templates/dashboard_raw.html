@@ -6,29 +6,100 @@
     <title>Redirector Dashboard - Raw Mode</title>
     <style>
         body {
-            font-family: 'Consolas', 'Monaco', monospace;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
             margin: 0;
             padding: 20px;
             background-color: #000;
             color: #00ff00;
+            line-height: 1.4;
         }
         
         .info-banner {
-            background: #002233;
+            background: linear-gradient(135deg, #002233, #003344);
             color: #00ccff;
-            padding: 10px;
+            padding: 15px;
             margin-bottom: 20px;
             border: 2px solid #00ccff;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
         }
         
         .header {
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .header h1 {
+            margin: 0;
+            color: #00ff00;
+            font-size: 1.5rem;
+        }
+        
+        .status-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
         }
         
         .stats {
             margin-bottom: 20px;
+            background: #111;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        
+        .stats h2 {
+            margin-top: 0;
+            color: #00ccff;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            background: #0a0a0a;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 2px;
+        }
+        
+        .stat-value {
+            color: #00ff00;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            color: #888;
+            font-size: 0.8rem;
+            margin-top: 4px;
         }
         
         .filters {
@@ -36,204 +107,1030 @@
             padding: 15px;
             margin-bottom: 20px;
             border: 1px solid #333;
+            border-radius: 4px;
+        }
+        
+        .filters h3 {
+            margin-top: 0;
+            color: #00ccff;
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .filter-group label {
+            color: #888;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            text-transform: uppercase;
         }
         
         .filters input, .filters select {
             background: #000;
             color: #00ff00;
             border: 1px solid #333;
-            padding: 5px;
-            margin: 5px;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        
-        th, td {
-            border: 1px solid #333;
             padding: 8px;
-            text-align: left;
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 0.9rem;
         }
         
-        th {
-            background-color: #222;
-            color: #00ff00;
+        .filters input:focus, .filters select:focus {
+            outline: none;
+            border-color: #00ccff;
+            box-shadow: 0 0 0 2px rgba(0, 204, 255, 0.2);
         }
         
-        tr:nth-child(even) {
-            background-color: #111;
+        .controls {
+            background: #111;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-radius: 4px;
         }
         
-        .method-get { color: #00ff00; }
-        .method-post { color: #ffff00; }
-        .method-put { color: #ff8800; }
-        .method-delete { color: #ff0000; }
-        .method-other { color: #888; }
-        
-        .campaign { 
-            color: #00ffff;
-            font-weight: bold;
+        .controls h3 {
+            margin-top: 0;
+            color: #00ccff;
         }
         
-        a {
-            color: #00ff00;
-        }
-        
-        a:visited {
-            color: #008800;
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         button {
             background: #000;
             color: #00ff00;
             border: 1px solid #333;
-            padding: 5px 10px;
+            padding: 8px 16px;
             cursor: pointer;
-            margin: 2px;
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         
-        button:hover {
+        button:hover:not(:disabled) {
             background: #333;
+            border-color: #00ccff;
         }
         
-        .export-section {
-            margin: 20px 0;
-            padding: 10px;
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button.active {
+            background: #003300;
+            border-color: #00ff00;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1px solid #333;
+            border-top: 1px solid #00ff00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .table-container {
             background: #111;
             border: 1px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .table-header {
+            background: #222;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .table-header h3 {
+            margin: 0;
+            color: #00ccff;
+        }
+        
+        .table-info {
+            color: #888;
+            font-size: 0.8rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        
+        th, td {
+            border-bottom: 1px solid #333;
+            padding: 12px 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #1a1a1a;
+            color: #00ccff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+        
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        
+        tbody tr:hover {
+            background-color: #1a1a1a;
+        }
+        
+        tbody tr:nth-child(even) {
+            background-color: #0a0a0a;
+        }
+        
+        tbody tr:nth-child(even):hover {
+            background-color: #1a1a1a;
+        }
+        
+        .method-badge {
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .method-get { background: #003300; color: #00ff00; }
+        .method-post { background: #333300; color: #ffff00; }
+        .method-put { background: #332200; color: #ff8800; }
+        .method-delete { background: #330000; color: #ff0000; }
+        .method-patch { background: #330033; color: #ff00ff; }
+        .method-head { background: #222; color: #888; }
+        .method-options { background: #002233; color: #00ccff; }
+        .method-unknown { background: #111; color: #666; }
+        
+        .campaign-badge {
+            background: #002233;
+            color: #00ccff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .truncate {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .timestamp {
+            color: #888;
+            font-size: 0.8rem;
+        }
+        
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            color: #00ccff;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+        
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+        
+        .pagination {
+            padding: 15px;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .pagination button {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+        
+        .page-info {
+            color: #888;
+            font-size: 0.8rem;
+        }
+        
+        .error-message {
+            background: #330000;
+            color: #ff6666;
+            padding: 15px;
+            border: 1px solid #660000;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .success-message {
+            background: #003300;
+            color: #66ff66;
+            padding: 15px;
+            border: 1px solid #006600;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+            
+            .stats-grid, .filter-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+            
+            table {
+                font-size: 0.75rem;
+            }
+            
+            th, td {
+                padding: 8px 4px;
+            }
         }
     </style>
 </head>
 <body>
     <!-- Info Banner -->
     <div class="info-banner">
-        📊 REDIRECTOR DASHBOARD: Professional URL redirection with comprehensive analytics and campaign tracking.
+        📊 REDIRECTOR DASHBOARD - RAW MODE: Real-time analytics without page refreshes
     </div>
     
+    <!-- Header -->
     <div class="header">
-        <h1>🎯 REDIRECTOR DASHBOARD - RAW MODE</h1>
-        <p>Campaign: <span class="campaign">{{ current_campaign }}</span></p>
-        <p>Status: <span style="color: #00ff00;">●</span> LIVE</p>
+        <h1>🎯 REDIRECTOR DASHBOARD</h1>
+        <div class="status-info">
+            <div>
+                <span class="live-indicator"></span>
+                <span>LIVE</span>
+            </div>
+            <div>
+                Campaign: <span class="campaign-badge" id="current-campaign">{{ current_campaign or 'Default' }}</span>
+            </div>
+            <div>
+                Updated: <span id="last-updated">Just now</span>
+            </div>
+        </div>
     </div>
     
     <!-- Statistics -->
     <div class="stats">
-        <h2>STATISTICS</h2>
-        <ul>
-            <li>Total Requests: {{ stats.total_requests }}</li>
-            <li>Recent Requests (24h): {{ stats.recent_requests }}</li>
-            <li>Active Campaigns: {{ campaigns|length }}</li>
-            <li>HTTP Methods: {{ stats.methods|length }}</li>
-        </ul>
+        <h2>📊 STATISTICS</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value" id="total-requests">{{ stats.total_requests or 0 }}</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="recent-requests">{{ stats.recent_requests or 0 }}</div>
+                <div class="stat-label">Last 24 Hours</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="campaign-count">{{ campaigns|length if campaigns else 0 }}</div>
+                <div class="stat-label">Active Campaigns</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="method-count">{{ stats.methods|length if stats.methods else 0 }}</div>
+                <div class="stat-label">HTTP Methods</div>
+            </div>
+        </div>
     </div>
     
-    <!-- Export Section -->
-    <div class="export-section">
-        <h3>EXPORT DATA</h3>
-        <a href="/api/logs/export.csv" target="_blank">
-            <button>📊 EXPORT CSV</button>
-        </a>
-        <a href="/api/logs/export.jsonl" target="_blank">
-            <button>📄 EXPORT JSONL</button>
-        </a>
+    <!-- Controls -->
+    <div class="controls">
+        <h3>⚡ CONTROLS</h3>
+        <div class="button-group">
+            <button id="refresh-btn" onclick="refreshData()">
+                <span>🔄</span>
+                <span>REFRESH</span>
+            </button>
+            <button id="auto-refresh-btn" onclick="toggleAutoRefresh()" class="active">
+                <span>⏸️</span>
+                <span>PAUSE AUTO</span>
+            </button>
+            <button onclick="exportData('csv')">
+                <span>📊</span>
+                <span>EXPORT CSV</span>
+            </button>
+            <button onclick="exportData('jsonl')">
+                <span>📄</span>
+                <span>EXPORT JSONL</span>
+            </button>
+            <button onclick="clearFilters()">
+                <span>🧹</span>
+                <span>CLEAR FILTERS</span>
+            </button>
+        </div>
     </div>
     
-    <!-- Basic Filters -->
+    <!-- Filters -->
     <div class="filters">
-        <h3>FILTERS</h3>
-        <form method="GET">
-            <label>Campaign:</label>
-            <select name="campaign">
-                <option value="">All Campaigns</option>
-                {% for campaign in campaigns %}
+        <h3>🔍 FILTERS</h3>
+        <div class="filter-grid">
+            <div class="filter-group">
+                <label>Campaign</label>
+                <select id="campaign-filter" onchange="applyFilters()">
+                    <option value="">All Campaigns</option>
+                    {% for campaign in campaigns %}
                     <option value="{{ campaign.name }}">{{ campaign.name }}</option>
-                {% endfor %}
-            </select>
+                    {% endfor %}
+                </select>
+            </div>
             
-            <label>Method:</label>
-            <select name="method">
-                <option value="">All Methods</option>
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
-                <option value="HEAD">HEAD</option>
-                <option value="OPTIONS">OPTIONS</option>
-            </select>
+            <div class="filter-group">
+                <label>HTTP Method</label>
+                <select id="method-filter" onchange="applyFilters()">
+                    <option value="">All Methods</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="OPTIONS">OPTIONS</option>
+                </select>
+            </div>
             
-            <label>IP:</label>
-            <input type="text" name="ip" placeholder="Filter by IP">
+            <div class="filter-group">
+                <label>IP Address</label>
+                <input type="text" id="ip-filter" placeholder="Filter by IP..." oninput="debounceFilter()">
+            </div>
             
-            <label>User Agent:</label>
-            <input type="text" name="ua" placeholder="Filter by UA">
-            
-            <label>Path:</label>
-            <input type="text" name="path" placeholder="Filter by path">
-            
-            <button type="submit">APPLY FILTERS</button>
-        </form>
+            <div class="filter-group">
+                <label>Time Range</label>
+                <select id="time-range-filter" onchange="applyTimeFilter()">
+                    <option value="">All Time</option>
+                    <option value="1h">Last Hour</option>
+                    <option value="6h">Last 6 Hours</option>
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                </select>
+            </div>
+        </div>
     </div>
+    
+    <!-- Messages -->
+    <div id="error-message" class="error-message" style="display: none;"></div>
+    <div id="success-message" class="success-message" style="display: none;"></div>
     
     <!-- Logs Table -->
-    <h2>REQUEST LOGS ({{ logs|length }} entries)</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>TIMESTAMP</th>
-                <th>IP</th>
-                <th>METHOD</th>
-                <th>PATH</th>
-                <th>USER AGENT</th>
-                <th>CAMPAIGN</th>
-                <th>DETAILS</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for log in logs %}
-            <tr>
-                <td>{{ log.id }}</td>
-                <td>{{ log.timestamp[:19] if log.timestamp else 'N/A' }}</td>
-                <td>{{ log.ip or log.x_forwarded_for or 'Unknown' }}</td>
-                <td class="method-{{ (log.method | lower) if log.method else 'other' }}">
-                    {{ log.method or 'UNKNOWN' }}
-                </td>
-                <td>{{ log.path or '/' }}</td>
-                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
-                    {{ log.user_agent[:50] + '...' if log.user_agent and log.user_agent|length > 50 else (log.user_agent or 'Unknown') }}
-                </td>
-                <td class="campaign">{{ log.campaign }}</td>
-                <td>
-                    <a href="/logs/{{ log.id }}" target="_blank">VIEW</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    
-    {% if logs|length == 0 %}
-    <p style="text-align: center; padding: 40px; color: #888;">
-        NO LOGS FOUND MATCHING CURRENT FILTERS
-    </p>
-    {% endif %}
-    
-    <!-- Auto-refresh script -->
-    <script>
-        // Auto-refresh every 30 seconds in raw mode
-        setTimeout(function() {
-            location.reload();
-        }, 30000);
+    <div class="table-container">
+        <div class="table-header">
+            <h3>📋 REQUEST LOGS</h3>
+            <div class="table-info">
+                <span id="table-info">Loading...</span>
+            </div>
+        </div>
         
-        // Show a simple indicator
-        setInterval(function() {
-            document.title = document.title.includes('●') ? 
-                'Redirector Dashboard - Raw Mode' : 
-                '● Redirector Dashboard - Raw Mode';
-        }, 1000);
+        <div id="table-content">
+            <table id="logs-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>IP</th>
+                        <th>Method</th>
+                        <th>Path</th>
+                        <th>User Agent</th>
+                        <th>Campaign</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-tbody">
+                    <!-- Initial server-side rendered logs -->
+                    {% for log in logs %}
+                    <tr>
+                        <td class="timestamp">{{ log.timestamp.strftime('%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}</td>
+                        <td class="ip-address">{{ log.x_forwarded_for or log.ip or 'Unknown' }}</td>
+                        <td>
+                            <span class="method-badge method-{{ (log.method or 'unknown').lower() }}">
+                                {{ log.method or 'UNKNOWN' }}
+                            </span>
+                        </td>
+                        <td class="truncate" title="{{ log.path or '/' }}">{{ log.path or '/' }}</td>
+                        <td class="truncate" title="{{ log.user_agent or 'Unknown' }}">{{ log.user_agent or 'Unknown' }}</td>
+                        <td>
+                            <span class="campaign-badge">{{ log.campaign or 'default' }}</span>
+                        </td>
+                        <td>
+                            <button onclick="showLogDetails({{ log.id }})">
+                                <span>👁️</span>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <div class="icon">📭</div>
+                            <div>No logs available</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination" id="pagination" style="display: none;">
+            <button id="prev-btn" onclick="previousPage()" disabled>← PREV</button>
+            <span class="page-info" id="page-info">Page 1 of 1</span>
+            <button id="next-btn" onclick="nextPage()" disabled>NEXT →</button>
+        </div>
+    </div>
+
+    <!-- Modern JavaScript with no page refreshes -->
+    <script>
+        /**
+         * Raw Dashboard Application - No Page Refreshes
+         * Modern AJAX-based updates with terminal aesthetics
+         */
+        
+        // Application state
+        const dashboardState = {
+            logs: [],
+            stats: {
+                total_requests: {{ stats.total_requests or 0 }},
+                recent_requests: {{ stats.recent_requests or 0 }},
+                campaign_count: {{ campaigns|length if campaigns else 0 }},
+                method_count: {{ stats.methods|length if stats.methods else 0 }}
+            },
+            filters: {
+                campaign: '',
+                method: '',
+                ip: '',
+                timeRange: '',
+                startTime: '',
+                endTime: ''
+            },
+            pagination: {
+                currentPage: 1,
+                totalPages: 1,
+                perPage: 50,
+                totalItems: 0
+            },
+            autoRefresh: {
+                enabled: true,
+                interval: 10000, // 10 seconds
+                timerId: null
+            },
+            loading: false,
+            debounceTimer: null,
+            abortController: null
+        };
+        
+        /**
+         * Initialize dashboard on load
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            console.info('🚀 Raw Dashboard initialized');
+            initializeData();
+            startAutoRefresh();
+            setupEventListeners();
+        });
+        
+        /**
+         * Initialize data from server-side rendering
+         */
+        function initializeData() {
+            try {
+                // Initialize with server data
+                dashboardState.logs = {{ logs | tojson | safe }} || [];
+                dashboardState.pagination.totalItems = dashboardState.logs.length;
+                dashboardState.pagination.totalPages = Math.ceil(dashboardState.pagination.totalItems / dashboardState.pagination.perPage) || 1;
+                
+                updateLastUpdated();
+                updateTableInfo();
+                
+            } catch (error) {
+                console.error('Failed to initialize data:', error);
+                showError('Failed to initialize dashboard data');
+            }
+        }
+        
+        /**
+         * Set up event listeners
+         */
+        function setupEventListeners() {
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case 'r':
+                            e.preventDefault();
+                            refreshData();
+                            break;
+                    }
+                }
+            });
+            
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', function() {
+                cleanup();
+            });
+        }
+        
+        /**
+         * Refresh all data via AJAX
+         */
+        async function refreshData() {
+            if (dashboardState.loading) return;
+            
+            console.info('🔄 Refreshing data...');
+            setLoading(true);
+            
+            try {
+                await Promise.all([
+                    fetchLogs(),
+                    fetchStats()
+                ]);
+                
+                showSuccess('Data refreshed successfully');
+                updateLastUpdated();
+                
+            } catch (error) {
+                console.error('Refresh failed:', error);
+                showError('Failed to refresh data: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        /**
+         * Fetch logs from API
+         */
+        async function fetchLogs() {
+            // Cancel any pending request
+            if (dashboardState.abortController) {
+                dashboardState.abortController.abort();
+            }
+            
+            dashboardState.abortController = new AbortController();
+            
+            const params = new URLSearchParams({
+                page: dashboardState.pagination.currentPage.toString(),
+                per_page: dashboardState.pagination.perPage.toString()
+            });
+            
+            // Add filters
+            addFiltersToParams(params);
+            
+            const response = await fetch(`/api/logs?${params}`, {
+                signal: dashboardState.abortController.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            dashboardState.logs = Array.isArray(data.logs) ? data.logs : [];
+            dashboardState.pagination.totalItems = typeof data.total === 'number' ? data.total : 0;
+            dashboardState.pagination.totalPages = typeof data.pages === 'number' ? data.pages : 1;
+            
+            renderLogsTable();
+            updateTableInfo();
+            updatePagination();
+            
+            console.info(`📊 Fetched ${dashboardState.logs.length} logs`);
+        }
+        
+        /**
+         * Fetch statistics from API
+         */
+        async function fetchStats() {
+            const params = new URLSearchParams();
+            if (dashboardState.filters.campaign) {
+                params.append('campaign', dashboardState.filters.campaign);
+            }
+            
+            const response = await fetch(`/api/stats?${params}`, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            dashboardState.stats = {
+                total_requests: data.total_requests || 0,
+                recent_requests: data.recent_requests || 0,
+                campaign_count: data.campaigns ? data.campaigns.length : 0,
+                method_count: data.methods ? Object.keys(data.methods).length : 0
+            };
+            
+            renderStats();
+        }
+        
+        /**
+         * Add filters to URL params
+         */
+        function addFiltersToParams(params) {
+            const filterMap = {
+                campaign: 'campaign',
+                method: 'method_filter',
+                ip: 'ip_filter',
+                startTime: 'start_time',
+                endTime: 'end_time'
+            };
+            
+            Object.entries(filterMap).forEach(([filterKey, paramKey]) => {
+                const value = dashboardState.filters[filterKey];
+                if (value && value.trim()) {
+                    params.append(paramKey, value.trim());
+                }
+            });
+        }
+        
+        /**
+         * Render logs table
+         */
+        function renderLogsTable() {
+            const tbody = document.getElementById('logs-tbody');
+            
+            if (dashboardState.logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <div class="icon">📭</div>
+                            <div>No logs match your filters</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = dashboardState.logs.map(log => `
+                <tr>
+                    <td class="timestamp">${formatTimestamp(log.timestamp)}</td>
+                    <td class="ip-address">${escapeHtml(log.x_forwarded_for || log.ip || 'Unknown')}</td>
+                    <td>
+                        <span class="method-badge method-${getMethodClass(log.method)}">
+                            ${escapeHtml(log.method || 'UNKNOWN')}
+                        </span>
+                    </td>
+                    <td class="truncate" title="${escapeHtml(log.path || '/')}">${escapeHtml(truncateText(log.path || '/', 20))}</td>
+                    <td class="truncate" title="${escapeHtml(log.user_agent || 'Unknown')}">${escapeHtml(truncateText(log.user_agent || 'Unknown', 25))}</td>
+                    <td>
+                        <span class="campaign-badge">${escapeHtml(log.campaign || 'default')}</span>
+                    </td>
+                    <td>
+                        <button onclick="showLogDetails(${log.id})">
+                            <span>👁️</span>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        /**
+         * Render statistics
+         */
+        function renderStats() {
+            document.getElementById('total-requests').textContent = formatNumber(dashboardState.stats.total_requests);
+            document.getElementById('recent-requests').textContent = formatNumber(dashboardState.stats.recent_requests);
+            document.getElementById('campaign-count').textContent = formatNumber(dashboardState.stats.campaign_count);
+            document.getElementById('method-count').textContent = formatNumber(dashboardState.stats.method_count);
+        }
+        
+        /**
+         * Apply filters
+         */
+        function applyFilters() {
+            dashboardState.filters.campaign = document.getElementById('campaign-filter').value;
+            dashboardState.filters.method = document.getElementById('method-filter').value;
+            dashboardState.filters.ip = document.getElementById('ip-filter').value;
+            
+            dashboardState.pagination.currentPage = 1; // Reset to first page
+            refreshData();
+        }
+        
+        /**
+         * Apply time filter
+         */
+        function applyTimeFilter() {
+            const timeRange = document.getElementById('time-range-filter').value;
+            dashboardState.filters.timeRange = timeRange;
+            
+            if (timeRange) {
+                const now = new Date();
+                const timeRangeMap = {
+                    '1h': 60 * 60 * 1000,
+                    '6h': 6 * 60 * 60 * 1000,
+                    '24h': 24 * 60 * 60 * 1000,
+                    '7d': 7 * 24 * 60 * 60 * 1000,
+                    '30d': 30 * 24 * 60 * 60 * 1000
+                };
+                
+                if (timeRangeMap[timeRange]) {
+                    dashboardState.filters.startTime = new Date(now.getTime() - timeRangeMap[timeRange]).toISOString();
+                    dashboardState.filters.endTime = '';
+                }
+            } else {
+                dashboardState.filters.startTime = '';
+                dashboardState.filters.endTime = '';
+            }
+            
+            applyFilters();
+        }
+        
+        /**
+         * Debounced filter application
+         */
+        function debounceFilter() {
+            if (dashboardState.debounceTimer) {
+                clearTimeout(dashboardState.debounceTimer);
+            }
+            
+            dashboardState.debounceTimer = setTimeout(() => {
+                applyFilters();
+            }, 300);
+        }
+        
+        /**
+         * Clear all filters
+         */
+        function clearFilters() {
+            document.getElementById('campaign-filter').value = '';
+            document.getElementById('method-filter').value = '';
+            document.getElementById('ip-filter').value = '';
+            document.getElementById('time-range-filter').value = '';
+            
+            dashboardState.filters = {
+                campaign: '',
+                method: '',
+                ip: '',
+                timeRange: '',
+                startTime: '',
+                endTime: ''
+            };
+            
+            refreshData();
+        }
+        
+        /**
+         * Toggle auto-refresh
+         */
+        function toggleAutoRefresh() {
+            dashboardState.autoRefresh.enabled = !dashboardState.autoRefresh.enabled;
+            
+            const btn = document.getElementById('auto-refresh-btn');
+            if (dashboardState.autoRefresh.enabled) {
+                btn.classList.add('active');
+                btn.innerHTML = '<span>⏸️</span><span>PAUSE AUTO</span>';
+                startAutoRefresh();
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<span>▶️</span><span>START AUTO</span>';
+                stopAutoRefresh();
+            }
+        }
+        
+        /**
+         * Start auto-refresh timer
+         */
+        function startAutoRefresh() {
+            stopAutoRefresh(); // Clear any existing timer
+            
+            if (!dashboardState.autoRefresh.enabled) return;
+            
+            dashboardState.autoRefresh.timerId = setInterval(async () => {
+                if (!dashboardState.loading && !document.hidden) {
+                    try {
+                        await refreshData();
+                        console.info('🔄 Auto-refresh completed');
+                    } catch (error) {
+                        console.warn('Auto-refresh failed:', error);
+                    }
+                }
+            }, dashboardState.autoRefresh.interval);
+        }
+        
+        /**
+         * Stop auto-refresh timer
+         */
+        function stopAutoRefresh() {
+            if (dashboardState.autoRefresh.timerId) {
+                clearInterval(dashboardState.autoRefresh.timerId);
+                dashboardState.autoRefresh.timerId = null;
+            }
+        }
+        
+        /**
+         * Export data
+         */
+        function exportData(format) {
+            const params = new URLSearchParams();
+            addFiltersToParams(params);
+            
+            const url = `/api/logs/export.${format}?${params}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `redirector_logs_${new Date().toISOString().split('T')[0]}.${format}`;
+            link.click();
+            
+            showSuccess(`Exporting data as ${format.toUpperCase()}...`);
+        }
+        
+        /**
+         * Pagination functions
+         */
+        function previousPage() {
+            if (dashboardState.pagination.currentPage > 1) {
+                dashboardState.pagination.currentPage--;
+                refreshData();
+            }
+        }
+        
+        function nextPage() {
+            if (dashboardState.pagination.currentPage < dashboardState.pagination.totalPages) {
+                dashboardState.pagination.currentPage++;
+                refreshData();
+            }
+        }
+        
+        /**
+         * Update pagination controls
+         */
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const pageInfo = document.getElementById('page-info');
+            
+            if (dashboardState.pagination.totalPages > 1) {
+                pagination.style.display = 'flex';
+                prevBtn.disabled = dashboardState.pagination.currentPage === 1;
+                nextBtn.disabled = dashboardState.pagination.currentPage >= dashboardState.pagination.totalPages;
+                pageInfo.textContent = `Page ${dashboardState.pagination.currentPage} of ${dashboardState.pagination.totalPages}`;
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+        
+        /**
+         * Show log details (placeholder for modal)
+         */
+        function showLogDetails(logId) {
+            const log = dashboardState.logs.find(l => l.id === logId);
+            if (log) {
+                alert(`Log Details:\nID: ${log.id}\nIP: ${log.ip}\nMethod: ${log.method}\nPath: ${log.path}\nTimestamp: ${log.timestamp}`);
+            }
+        }
+        
+        /**
+         * Utility functions
+         */
+        function setLoading(loading) {
+            dashboardState.loading = loading;
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            if (loading) {
+                refreshBtn.innerHTML = '<span class="loading"></span><span>LOADING</span>';
+                refreshBtn.disabled = true;
+            } else {
+                refreshBtn.innerHTML = '<span>🔄</span><span>REFRESH</span>';
+                refreshBtn.disabled = false;
+            }
+        }
+        
+        function updateLastUpdated() {
+            document.getElementById('last-updated').textContent = formatTimestamp(new Date().toISOString(), true);
+        }
+        
+        function updateTableInfo() {
+            const info = `Showing ${dashboardState.logs.length} of ${dashboardState.pagination.totalItems} requests`;
+            document.getElementById('table-info').textContent = info;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = `❌ ${message}`;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = `✅ ${message}`;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        function formatNumber(num) {
+            return typeof num === 'number' ? num.toLocaleString() : '0';
+        }
+        
+        function formatTimestamp(timestamp, includeSeconds = false) {
+            if (!timestamp) return 'N/A';
+            
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) return 'Invalid';
+                
+                const options = {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                };
+                
+                if (includeSeconds) {
+                    options.second = '2-digit';
+                }
+                
+                return date.toLocaleDateString('en-US', options);
+            } catch (e) {
+                return 'Invalid';
+            }
+        }
+        
+        function getMethodClass(method) {
+            return method ? method.toLowerCase() : 'unknown';
+        }
+        
+        function truncateText(text, length) {
+            if (!text || text.length <= length) return text;
+            return text.substring(0, length) + '...';
+        }
+        
+        function escapeHtml(unsafe) {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        function cleanup() {
+            console.info('🧹 Cleaning up raw dashboard');
+            stopAutoRefresh();
+            
+            if (dashboardState.debounceTimer) {
+                clearTimeout(dashboardState.debounceTimer);
+            }
+            
+            if (dashboardState.abortController) {
+                dashboardState.abortController.abort();
+            }
+        }
     </script>
 </body>
 </html>

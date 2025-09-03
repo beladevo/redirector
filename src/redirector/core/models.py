@@ -74,6 +74,9 @@ class LogEntry(Base):
     # Performance tracking
     response_time_ms = Column(Integer)
     
+    # Tunnel tracking
+    via_tunnel = Column(Boolean, default=False, index=True)
+    
     # Create indexes for common queries
     __table_args__ = (
         Index('idx_timestamp_campaign', 'timestamp', 'campaign'),
@@ -88,7 +91,8 @@ class LogEntry(Base):
         request, 
         campaign: str, 
         store_body: bool = False,
-        response_time_ms: Optional[int] = None
+        response_time_ms: Optional[int] = None,
+        via_tunnel: bool = False
     ) -> "LogEntry":
         """Create LogEntry from FastAPI request."""
         from urllib.parse import urlparse, parse_qs
@@ -127,7 +131,8 @@ class LogEntry(Base):
             referer=request.headers.get("Referer"),
             accept_language=request.headers.get("Accept-Language"),
             campaign=campaign,
-            response_time_ms=response_time_ms
+            response_time_ms=response_time_ms,
+            via_tunnel=via_tunnel
         )
         
         return entry
@@ -150,7 +155,8 @@ class LogEntry(Base):
             'accept_language': self.accept_language,
             'campaign': self.campaign,
             'response_time_ms': self.response_time_ms,
-            'has_body': bool(self.body_content)
+            'has_body': bool(self.body_content),
+            'via_tunnel': self.via_tunnel
         }
     
     def to_csv_row(self) -> Dict[str, Any]:
@@ -169,7 +175,8 @@ class LogEntry(Base):
             'accept_language': self.accept_language or '',
             'campaign': self.campaign or '',
             'response_time_ms': self.response_time_ms or '',
-            'has_body': 'true' if self.body_content else 'false'
+            'has_body': 'true' if self.body_content else 'false',
+            'via_tunnel': 'true' if self.via_tunnel else 'false'
         }
 
 
@@ -189,6 +196,31 @@ class DatabaseManager:
     def create_tables(self) -> None:
         """Create all tables."""
         Base.metadata.create_all(self.engine)
+        # Run migrations for existing databases
+        self._run_migrations()
+    
+    def _run_migrations(self) -> None:
+        """Run database migrations for schema updates."""
+        session = self.get_session()
+        try:
+            # Check if via_tunnel column exists, add it if it doesn't
+            from sqlalchemy import inspect, text
+            
+            inspector = inspect(self.engine)
+            columns = [col['name'] for col in inspector.get_columns('logs')]
+            
+            if 'via_tunnel' not in columns:
+                print("Adding via_tunnel column to logs table...")
+                session.execute(text("ALTER TABLE logs ADD COLUMN via_tunnel BOOLEAN DEFAULT FALSE"))
+                session.execute(text("CREATE INDEX IF NOT EXISTS idx_via_tunnel ON logs (via_tunnel)"))
+                session.commit()
+                print("Migration completed: via_tunnel column added")
+                
+        except Exception as e:
+            print(f"Migration warning: {e}")
+            session.rollback()
+        finally:
+            session.close()
     
     def get_session(self) -> Session:
         """Get database session."""
@@ -247,12 +279,14 @@ class DatabaseManager:
             user_agents = session.query(
                 LogEntry.user_agent,
                 func.count(LogEntry.id)
-            ).group_by(LogEntry.user_agent).order_by(
-                desc(func.count(LogEntry.id))
-            ).limit(10)
+            ).group_by(LogEntry.user_agent)
             
             if campaign_name:
                 user_agents = user_agents.filter(LogEntry.campaign == campaign_name)
+            
+            user_agents = user_agents.order_by(
+                desc(func.count(LogEntry.id))
+            ).limit(10)
             
             ua_stats = {ua or 'Unknown': count for ua, count in user_agents.all()}
             
@@ -367,5 +401,81 @@ class DatabaseManager:
                 query = query.filter(LogEntry.path.like(f"%{path_filter}%"))
             
             return query.count()
+        finally:
+            session.close()
+    
+    def get_campaign_cards(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get campaign cards with metadata for dashboard."""
+        session = self.get_session()
+        try:
+            # Get campaigns with request counts and latest activity
+            campaign_cards = []
+            
+            campaigns = session.query(Campaign).filter(
+                Campaign.is_active == True
+            ).order_by(desc(Campaign.updated_at)).offset(offset).limit(limit).all()
+            
+            for campaign in campaigns:
+                # Get request count for this campaign
+                request_count = session.query(LogEntry).filter(
+                    LogEntry.campaign == campaign.name
+                ).count()
+                
+                # Get latest request timestamp
+                latest_request = session.query(LogEntry).filter(
+                    LogEntry.campaign == campaign.name
+                ).order_by(desc(LogEntry.timestamp)).first()
+                
+                # Get tunnel usage stats
+                tunnel_requests = session.query(LogEntry).filter(
+                    LogEntry.campaign == campaign.name,
+                    LogEntry.via_tunnel == True
+                ).count()
+                
+                # Get top methods for this campaign
+                top_methods = session.query(
+                    LogEntry.method,
+                    func.count(LogEntry.id)
+                ).filter(
+                    LogEntry.campaign == campaign.name
+                ).group_by(LogEntry.method).order_by(
+                    desc(func.count(LogEntry.id))
+                ).limit(3).all()
+                
+                # Get recent activity (last 24 hours)
+                from datetime import timedelta
+                last_24h = datetime.utcnow() - timedelta(hours=24)
+                recent_count = session.query(LogEntry).filter(
+                    LogEntry.campaign == campaign.name,
+                    LogEntry.timestamp >= last_24h
+                ).count()
+                
+                campaign_card = {
+                    'id': campaign.id,
+                    'name': campaign.name,
+                    'description': campaign.description,
+                    'created_at': campaign.created_at.isoformat(),
+                    'updated_at': campaign.updated_at.isoformat(),
+                    'is_active': campaign.is_active,
+                    'request_count': request_count,
+                    'recent_count': recent_count,
+                    'tunnel_requests': tunnel_requests,
+                    'tunnel_percentage': round((tunnel_requests / request_count * 100) if request_count > 0 else 0, 1),
+                    'latest_request': latest_request.timestamp.isoformat() if latest_request else None,
+                    'top_methods': [{'method': method, 'count': count} for method, count in top_methods]
+                }
+                
+                campaign_cards.append(campaign_card)
+            
+            return campaign_cards
+            
+        finally:
+            session.close()
+    
+    def get_campaign_cards_count(self) -> int:
+        """Get total count of active campaigns for pagination."""
+        session = self.get_session()
+        try:
+            return session.query(Campaign).filter(Campaign.is_active == True).count()
         finally:
             session.close()

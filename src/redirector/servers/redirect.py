@@ -40,11 +40,22 @@ def create_redirect_app(config: RedirectorConfig) -> FastAPI:
         start_time = time.time()
         
         try:
+            # Determine if request came through tunnel
+            # Check for cloudflare headers or if tunnel is enabled and tunnel_url exists
+            via_tunnel = bool(
+                config.tunnel and config.tunnel_url and (
+                    request.headers.get("cf-ray") or  # Cloudflare Ray ID header
+                    request.headers.get("cf-ipcountry") or  # Cloudflare IP country
+                    request.headers.get("x-forwarded-for")  # Proxy header (common with tunnels)
+                )
+            )
+            
             # Create log entry
             log_entry = LogEntry.from_request(
                 request=request,
                 campaign=config.campaign,
-                store_body=config.store_body
+                store_body=config.store_body,
+                via_tunnel=via_tunnel
             )
             
             # Calculate response time
