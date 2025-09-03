@@ -25,24 +25,28 @@ __license__ = "MIT"
 
 # Info banner
 INFO_BANNER = """
-📊  REDIRECTOR - PROFESSIONAL URL REDIRECTOR 📊
+⚠️  REDIRECTOR - URL REDIRECTION TOOL ⚠️
 
-Powerful URL redirection with comprehensive analytics and campaign tracking.
+This tool creates servers that log visitor data and redirect traffic.
 
-✅ Great for:
-  • Development & testing environments
-  • Marketing campaign tracking
-  • Research and analytics projects
-  • Educational purposes
-  • API testing and monitoring
-  • Load testing and performance analysis
+🚨 SECURITY WARNINGS:
+  • This tool captures and stores visitor information
+  • All HTTP requests and headers are logged to a database
+  • IP addresses, user agents, and request data are recorded
+  • Dashboard provides access to sensitive visitor data
+  • Consider privacy implications and legal requirements
 
-🔍 Features:
-  • Campaign-based tracking
-  • Real-time dashboard
-  • Comprehensive logging
-  • Export capabilities
-  • RESTful API
+⚖️  LEGAL NOTICE:
+  • Ensure compliance with privacy laws (GDPR, CCPA, etc.)
+  • Obtain proper consent for data collection
+  • Use only for legitimate purposes
+  • Respect visitor privacy and data protection rights
 
-Use responsibly and in accordance with applicable laws.
+🔒 RESPONSIBLE USE:
+  • Only use in controlled environments you own/manage
+  • Implement proper data protection measures
+  • Consider data retention and deletion policies
+  • Be transparent about data collection practices
+
+UNAUTHORIZED OR MALICIOUS USE IS STRICTLY PROHIBITED.
 """

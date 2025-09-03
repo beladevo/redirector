@@ -43,6 +43,31 @@ class LogResponse(BaseModel):
     campaign: str
     response_time_ms: Optional[int]
     has_body: bool
+    via_tunnel: bool
+
+
+class CampaignCardResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    created_at: str
+    updated_at: str
+    is_active: bool
+    request_count: int
+    recent_count: int
+    tunnel_requests: int
+    tunnel_percentage: float
+    latest_request: Optional[str]
+    top_methods: List[Dict[str, Any]]
+    tunnel_url: Optional[str] = None
+
+
+class CampaignCardsResponse(BaseModel):
+    campaign_cards: List[CampaignCardResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int
 
 
 class LogsResponse(BaseModel):
@@ -71,6 +96,39 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
         """Health check endpoint."""
         return {"status": "ok", "service": "dashboard"}
     
+    @router.get("/campaign-cards", response_model=CampaignCardsResponse)
+    async def get_campaign_cards(
+        page: int = Query(1, ge=1, description="Page number"),
+        per_page: int = Query(20, ge=1, le=100, description="Cards per page")
+    ) -> CampaignCardsResponse:
+        """Get campaign cards with metadata for dashboard."""
+        offset = (page - 1) * per_page
+        
+        campaign_cards = db_manager.get_campaign_cards(limit=per_page, offset=offset)
+        total = db_manager.get_campaign_cards_count()
+        pages = (total + per_page - 1) // per_page
+        
+        # Add current tunnel URL to cards if available
+        for card in campaign_cards:
+            if card['name'] == config.campaign and config.tunnel_url:
+                card['tunnel_url'] = config.tunnel_url
+            else:
+                card['tunnel_url'] = None
+        
+        # Convert to response models
+        card_responses = []
+        for card in campaign_cards:
+            card_response = CampaignCardResponse(**card)
+            card_responses.append(card_response)
+        
+        return CampaignCardsResponse(
+            campaign_cards=card_responses,
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=pages
+        )
+
     @router.get("/campaigns", response_model=List[CampaignResponse])
     async def get_campaigns() -> List[CampaignResponse]:
         """Get all campaigns."""

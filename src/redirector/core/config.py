@@ -28,6 +28,7 @@ class RedirectorConfig:
     
     # Tunnel settings
     tunnel: bool = False
+    tunnel_url: Optional[str] = None  # Set dynamically when tunnel starts
     
     # Runtime settings
     host: str = "0.0.0.0"
