@@ -391,4 +391,70 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
             campaign=stats['campaign']
         )
     
+    @router.delete("/logs")
+    async def clear_logs(
+        campaign: Optional[str] = Query(None, description="Campaign to clear logs for (if not provided, clears all)")
+    ) -> Dict[str, Any]:
+        """Clear logs from database."""
+        session = db_manager.get_session()
+        try:
+            if campaign:
+                # Clear logs for specific campaign
+                deleted_count = session.query(LogEntry).filter(LogEntry.campaign == campaign).count()
+                session.query(LogEntry).filter(LogEntry.campaign == campaign).delete()
+                message = f"Cleared {deleted_count} logs for campaign '{campaign}'"
+            else:
+                # Clear all logs
+                deleted_count = session.query(LogEntry).count()
+                session.query(LogEntry).delete()
+                message = f"Cleared all {deleted_count} logs from database"
+            
+            session.commit()
+            
+            return {
+                "success": True,
+                "message": message,
+                "deleted_count": deleted_count
+            }
+        except Exception as e:
+            session.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to clear logs: {str(e)}")
+        finally:
+            session.close()
+
+    @router.delete("/campaigns/{campaign_id}")
+    async def delete_campaign(campaign_id: int) -> Dict[str, Any]:
+        """Delete a campaign and all its logs."""
+        session = db_manager.get_session()
+        try:
+            # Get campaign
+            campaign = session.query(Campaign).filter(Campaign.id == campaign_id).first()
+            if not campaign:
+                raise HTTPException(status_code=404, detail="Campaign not found")
+            
+            campaign_name = campaign.name
+            
+            # Delete logs for this campaign
+            logs_deleted = session.query(LogEntry).filter(LogEntry.campaign == campaign_name).count()
+            session.query(LogEntry).filter(LogEntry.campaign == campaign_name).delete()
+            
+            # Delete campaign
+            session.delete(campaign)
+            session.commit()
+            
+            return {
+                "success": True,
+                "message": f"Deleted campaign '{campaign_name}' and {logs_deleted} associated logs",
+                "campaign_name": campaign_name,
+                "logs_deleted": logs_deleted
+            }
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as e:
+            session.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
+        finally:
+            session.close()
+    
     return router

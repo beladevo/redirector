@@ -1,6 +1,6 @@
 # Redirector 🎯
 
-**Professional URL redirector with campaign tracking and analytics**
+**A flexible request logger and redirector with campaign tracking, analytics, and tunnel support**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -537,7 +537,7 @@ make check  # Run all quality checks
 ```
 
 ### Reporting Issues
-Please report security issues privately to security@example.com.
+Please report security issues privately.
 For other issues, use GitHub Issues with the appropriate template.
 
 ---
@@ -563,7 +563,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: This README and inline help (`redirector --help`)
 - **Issues**: [GitHub Issues](https://github.com/beladevo/redirector/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/beladevo/redirector/discussions)
-- **Security**: security@example.com (for security-related issues)
 
 ---
 

@@ -267,6 +267,29 @@
             border-color: #9ca3af;
         }
         
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #b45309;
+        }
+        
+        .btn-sm {
+            padding: var(--space-xs) var(--space-md);
+            font-size: 0.75rem;
+        }
+        
         .btn-group {
             display: flex;
             gap: var(--space-sm);
@@ -378,6 +401,15 @@
         
         .modal-body {
             padding: var(--space-lg);
+        }
+        
+        .modal-footer {
+            padding: var(--space-lg);
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-md);
         }
         
         /* Alert Components */
@@ -644,10 +676,68 @@
         }
         
         .campaign-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             font-size: 0.75rem;
             color: #64748b;
             border-top: 1px solid #e2e8f0;
             padding-top: var(--space-sm);
+        }
+        
+        .campaign-footer-info {
+            flex: 1;
+        }
+        
+        .campaign-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+        
+        .btn-action {
+            padding: var(--space-xs) var(--space-sm);
+            font-size: 0.75rem;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+        
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-clear {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fed7aa;
+        }
+        
+        .btn-clear:hover:not(:disabled) {
+            background: #fcd34d;
+            border-color: #f59e0b;
+        }
+        
+        .btn-delete {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fecaca;
+        }
+        
+        .btn-delete:hover:not(:disabled) {
+            background: #fca5a5;
+            border-color: #f87171;
+        }
+        
+        .campaign-header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
         }
         
         .last-activity {

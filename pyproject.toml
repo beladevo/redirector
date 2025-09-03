@@ -5,23 +5,31 @@ build-backend = "hatchling.build"
 [project]
 name = "redirector"
 version = "2.0.0"
-description = "Professional URL redirector with campaign tracking and analytics"
+description = "Professional OSINT tool for URL redirection with comprehensive request logging, IP tracking, and user-agent analysis"
 readme = "README.md"
 license = "MIT"
 authors = [
-    {name = "Developer Tools", email = "dev@example.com"},
+    {name = "Redirector Contributors", email = "security@redirector-tool.com"},
 ]
+keywords = ["osint", "ip-grabber", "user-agent-tracking", "cybersecurity", "security-tool", "request-logging", "redirector", "analytics", "threat-intelligence"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators", 
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.11", 
     "Programming Language :: Python :: 3.12",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Logging",
+    "Environment :: Web Environment",
+    "Operating System :: OS Independent",
 ]
 requires-python = ">=3.9"
 dependencies = [
@@ -169,3 +177,10 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = ["B101", "B601"]  # Skip assert statements and shell injection (we use subprocess safely)
+
+[tool.bandit.assert_used]
+skips = ["*/tests/*", "*/test_*.py"]
