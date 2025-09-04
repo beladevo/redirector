@@ -99,10 +99,25 @@ jobs:
         # Test that the image starts correctly
         docker run --rm -d --name test-redirector \
           -p 8080:8080 -p 3000:3000 \
-          redirector:test &
-        sleep 10
-        # Basic health check
-        curl -f http://localhost:3000/health || exit 1
+          redirector:test
+        
+        # Wait for container to be ready (max 60 seconds)
+        for i in {1..12}; do
+          if curl -f http://localhost:3000/health 2>/dev/null; then
+            echo "Container is ready!"
+            break
+          fi
+          echo "Waiting for container... ($i/12)"
+          sleep 5
+        done
+        
+        # Final health check
+        curl -f http://localhost:3000/health || {
+          echo "Health check failed, showing container logs:"
+          docker logs test-redirector
+          exit 1
+        }
+        
         docker stop test-redirector
 
   build-and-publish:
