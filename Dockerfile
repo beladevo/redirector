@@ -1,67 +1,56 @@
-# Multi-stage Dockerfile for production deployment
-FROM python:3.11-slim as builder
+# syntax=docker/dockerfile:1.6
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# ---------- Build (deps -> venv) ----------
+FROM python:3.11-slim AS builder
 
-# Set work directory
-WORKDIR /build
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Copy requirements and install dependencies
+WORKDIR /app
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
 
-# Production stage
+# Build venv with cached pip dir (valid BuildKit --mount usage)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# ---------- Runtime ----------
 FROM python:3.11-slim
 
-# Security: Create non-root user
-RUN groupadd -r redirector && useradd --no-log-init -r -g redirector redirector
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app/src \
+    DATABASE_PATH=/app/data/logs.db \
+    HOST=0.0.0.0 \
+    LOG_LEVEL=info
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Non-root user (Debian slim has adduser/addgroup)
+RUN addgroup --system redirector && adduser --system --ingroup redirector redirector
 
-# Set work directory
 WORKDIR /app
 
-# Copy wheels and install packages
-COPY --from=builder /build/wheels /wheels
-COPY requirements.txt .
-RUN pip install --no-cache /wheels/*
+# Bring in venv first for better layer reuse
+COPY --from=builder /opt/venv /opt/venv
 
-# Copy application code
+# App code (no dev/test/docs to keep image small; use .dockerignore too)
 COPY src/ ./src/
 COPY templates/ ./templates/
 COPY static/ ./static/
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data && chown -R redirector:redirector /app/data
-
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R redirector:redirector /app/logs
-
-# Switch to non-root user
+# Data & logs
+RUN mkdir -p /app/data /app/logs && chown -R redirector:redirector /app
 USER redirector
 
-# Set environment variables
-ENV PYTHONPATH=/app/src
-ENV DATABASE_PATH=/app/data/logs.db
-ENV HOST=0.0.0.0
-ENV LOG_LEVEL=info
-
-# Health check
+# Healthcheck (no curl; no heredoc)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD python -c "import urllib.request,sys; \
+    r=urllib.request.urlopen('http://localhost:3000/health',timeout=5); \
+    sys.exit(0 if r.status==200 else 1)" || exit 1
 
-# Expose ports
 EXPOSE 8080 3000
 
-# Default command
-CMD ["python", "-m", "redirector.cli.main", "run", \
-     "--redirect-port", "8080", \
-     "--dashboard-port", "3000", \
-     "--database", "/app/data/logs.db", \
-     "--accept-security-notice"]
+ENTRYPOINT ["python","-m","redirector.cli.main"]
+CMD ["run","--redirect-port","8080","--dashboard-port","3000","--database","/app/data/logs.db","--accept-security-notice"]

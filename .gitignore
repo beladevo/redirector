@@ -145,7 +145,7 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-.dockerignore
+# .dockerignore
 
 # Temporary files
 *.tmp
@@ -172,3 +172,5 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+.todos.md
