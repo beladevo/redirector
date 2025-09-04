@@ -26,6 +26,8 @@ redirector run --redirect https://your-target.com
 docker run -p 8080:8080 -p 3000:3000 redirector:latest
 ```
 
+> **Note**: The Docker image is now configured to automatically accept the security notice for non-interactive use.
+
 ## ✨ What it does
 
 - **Redirects** all traffic to your target URL
@@ -50,6 +52,8 @@ pip install redirector
 ```bash
 docker run -p 8080:8080 -p 3000:3000 redirector:latest
 ```
+
+The Docker image automatically accepts the security notice for non-interactive use.
 
 ### Method 3: From source
 

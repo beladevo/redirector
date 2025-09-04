@@ -90,6 +90,11 @@ def run(
         "info",
         "--log-level",
         help="Log level (debug, info, warning, error)"
+    ),
+    accept_security_notice: bool = typer.Option(
+        False,
+        "--accept-security-notice", "-y",
+        help="Accept security notice without interactive prompt (for Docker/CI)"
     )
 ) -> None:
     """
@@ -106,10 +111,13 @@ def run(
             box=box.DOUBLE
         ))
         
-        # Wait for user acknowledgment
-        if not typer.confirm("\nDo you acknowledge that you will use this tool responsibly and ethically?"):
-            console.print("[red]Tool usage not acknowledged. Exiting.[/red]")
-            raise typer.Exit(1)
+        # Wait for user acknowledgment (unless auto-accepted)
+        if not accept_security_notice:
+            if not typer.confirm("\nDo you acknowledge that you will use this tool responsibly and ethically?"):
+                console.print("[red]Tool usage not acknowledged. Exiting.[/red]")
+                raise typer.Exit(1)
+        else:
+            console.print("[green]✅ Security notice acknowledged via --accept-security-notice flag[/green]")
         
         # Load configuration
         config = RedirectorConfig(

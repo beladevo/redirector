@@ -63,4 +63,5 @@ EXPOSE 8080 3000
 CMD ["python", "-m", "redirector.cli.main", "run", \
      "--redirect-port", "8080", \
      "--dashboard-port", "3000", \
-     "--database", "/app/data/logs.db"]
+     "--database", "/app/data/logs.db", \
+     "--accept-security-notice"]

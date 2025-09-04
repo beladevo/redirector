@@ -23,6 +23,7 @@ services:
       --dashboard-port 3000
       --campaign docker-demo
       --database /app/data/logs.db
+      --accept-security-notice
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
