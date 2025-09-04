@@ -180,6 +180,96 @@ class LogEntry(Base):
         }
 
 
+class ServerStatus(Base):
+    """Server status model for tracking active redirect servers."""
+    __tablename__ = "server_status"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    server_id = Column(String(255), unique=True, nullable=False, index=True)
+    campaign = Column(String(255), nullable=False, index=True)
+    redirect_url = Column(Text, nullable=False)
+    redirect_port = Column(Integer, nullable=False)
+    dashboard_port = Column(Integer, nullable=True)
+    host = Column(String(255), nullable=False)
+    pid = Column(Integer, nullable=True)
+    
+    # Status tracking
+    status = Column(String(50), default='active', nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_seen = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    last_request_at = Column(DateTime, nullable=True)
+    
+    # Statistics
+    total_requests = Column(Integer, default=0, nullable=False)
+    requests_per_minute = Column(Integer, default=0, nullable=False)
+    avg_response_time = Column(Integer, default=0, nullable=False)
+    
+    # Tunnel information
+    tunnel_enabled = Column(Boolean, default=False, nullable=False)
+    tunnel_url = Column(Text, nullable=True)
+    
+    # Additional metadata
+    version = Column(String(50), nullable=True)
+    python_version = Column(String(50), nullable=True)
+    platform = Column(String(100), nullable=True)
+    
+    # Create indexes for common queries
+    __table_args__ = (
+        Index('idx_server_campaign_status', 'campaign', 'status'),
+        Index('idx_server_last_seen', 'last_seen'),
+        Index('idx_server_started_at', 'started_at'),
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        uptime_seconds = (datetime.utcnow() - self.started_at).total_seconds() if self.started_at else 0
+        last_seen_seconds = (datetime.utcnow() - self.last_seen).total_seconds() if self.last_seen else 0
+        
+        return {
+            'id': self.id,
+            'server_id': self.server_id,
+            'campaign': self.campaign,
+            'redirect_url': self.redirect_url,
+            'redirect_port': self.redirect_port,
+            'dashboard_port': self.dashboard_port,
+            'host': self.host,
+            'pid': self.pid,
+            'status': self.status,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None,
+            'last_request_at': self.last_request_at.isoformat() if self.last_request_at else None,
+            'uptime_seconds': int(uptime_seconds),
+            'uptime_formatted': self._format_uptime(uptime_seconds),
+            'last_seen_seconds': int(last_seen_seconds),
+            'is_active': self.status == 'active' and last_seen_seconds < 120,  # Active if seen in last 2 minutes
+            'total_requests': self.total_requests,
+            'requests_per_minute': self.requests_per_minute,
+            'avg_response_time': self.avg_response_time,
+            'tunnel_enabled': self.tunnel_enabled,
+            'tunnel_url': self.tunnel_url,
+            'version': self.version,
+            'python_version': self.python_version,
+            'platform': self.platform
+        }
+    
+    def _format_uptime(self, uptime_seconds: float) -> str:
+        """Format uptime in human-readable format."""
+        if uptime_seconds < 60:
+            return f"{int(uptime_seconds)}s"
+        elif uptime_seconds < 3600:
+            minutes = int(uptime_seconds / 60)
+            seconds = int(uptime_seconds % 60)
+            return f"{minutes}m {seconds}s"
+        elif uptime_seconds < 86400:
+            hours = int(uptime_seconds / 3600)
+            minutes = int((uptime_seconds % 3600) / 60)
+            return f"{hours}h {minutes}m"
+        else:
+            days = int(uptime_seconds / 86400)
+            hours = int((uptime_seconds % 86400) / 3600)
+            return f"{days}d {hours}h"
+
+
 class DatabaseManager:
     """Database management utilities."""
     
@@ -215,6 +305,13 @@ class DatabaseManager:
                 session.execute(text("CREATE INDEX IF NOT EXISTS idx_via_tunnel ON logs (via_tunnel)"))
                 session.commit()
                 print("Migration completed: via_tunnel column added")
+            
+            # Check if server_status table exists, create if it doesn't
+            tables = inspector.get_table_names()
+            if 'server_status' not in tables:
+                print("Creating server_status table...")
+                ServerStatus.__table__.create(self.engine, checkfirst=True)
+                print("Migration completed: server_status table created")
                 
         except Exception as e:
             print(f"Migration warning: {e}")
@@ -479,3 +576,224 @@ class DatabaseManager:
             return session.query(Campaign).filter(Campaign.is_active == True).count()
         finally:
             session.close()
+    
+    # ==================== SERVER STATUS MANAGEMENT ====================
+    
+    def register_server(
+        self,
+        server_id: str,
+        campaign: str,
+        redirect_url: str,
+        redirect_port: int,
+        dashboard_port: Optional[int] = None,
+        host: str = 'localhost',
+        pid: Optional[int] = None,
+        tunnel_enabled: bool = False,
+        tunnel_url: Optional[str] = None,
+        version: Optional[str] = None
+    ) -> None:
+        """Register or update a server in the status table."""
+        session = self.get_session()
+        try:
+            # Check if server already exists
+            existing_server = session.query(ServerStatus).filter(
+                ServerStatus.server_id == server_id
+            ).first()
+            
+            if existing_server:
+                # Update existing server
+                existing_server.campaign = campaign
+                existing_server.redirect_url = redirect_url
+                existing_server.redirect_port = redirect_port
+                existing_server.dashboard_port = dashboard_port
+                existing_server.host = host
+                existing_server.pid = pid
+                existing_server.status = 'active'
+                existing_server.last_seen = datetime.utcnow()
+                existing_server.tunnel_enabled = tunnel_enabled
+                existing_server.tunnel_url = tunnel_url
+                existing_server.version = version
+            else:
+                # Create new server entry
+                import platform
+                import sys
+                
+                server = ServerStatus(
+                    server_id=server_id,
+                    campaign=campaign,
+                    redirect_url=redirect_url,
+                    redirect_port=redirect_port,
+                    dashboard_port=dashboard_port,
+                    host=host,
+                    pid=pid,
+                    status='active',
+                    started_at=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                    tunnel_enabled=tunnel_enabled,
+                    tunnel_url=tunnel_url,
+                    version=version,
+                    python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                    platform=platform.system()
+                )
+                session.add(server)
+            
+            session.commit()
+        finally:
+            session.close()
+    
+    def update_server_heartbeat(
+        self,
+        server_id: str,
+        total_requests: Optional[int] = None,
+        requests_per_minute: Optional[int] = None,
+        avg_response_time: Optional[int] = None,
+        last_request_at: Optional[datetime] = None
+    ) -> None:
+        """Update server heartbeat and statistics."""
+        session = self.get_session()
+        try:
+            server = session.query(ServerStatus).filter(
+                ServerStatus.server_id == server_id
+            ).first()
+            
+            if server:
+                server.last_seen = datetime.utcnow()
+                
+                if total_requests is not None:
+                    server.total_requests = total_requests
+                if requests_per_minute is not None:
+                    server.requests_per_minute = requests_per_minute
+                if avg_response_time is not None:
+                    server.avg_response_time = avg_response_time
+                if last_request_at is not None:
+                    server.last_request_at = last_request_at
+                
+                session.commit()
+        finally:
+            session.close()
+    
+    def mark_server_inactive(self, server_id: str) -> None:
+        """Mark a server as inactive."""
+        session = self.get_session()
+        try:
+            server = session.query(ServerStatus).filter(
+                ServerStatus.server_id == server_id
+            ).first()
+            
+            if server:
+                server.status = 'inactive'
+                server.last_seen = datetime.utcnow()
+                session.commit()
+        finally:
+            session.close()
+    
+    def get_active_servers(self, campaign: Optional[str] = None) -> List[ServerStatus]:
+        """Get list of active servers."""
+        session = self.get_session()
+        try:
+            from datetime import timedelta
+            # Consider servers active if they've been seen in the last 2 minutes
+            cutoff_time = datetime.utcnow() - timedelta(minutes=2)
+            
+            query = session.query(ServerStatus).filter(
+                ServerStatus.last_seen >= cutoff_time
+            )
+            
+            if campaign:
+                query = query.filter(ServerStatus.campaign == campaign)
+            
+            return query.order_by(desc(ServerStatus.started_at)).all()
+        finally:
+            session.close()
+    
+    def get_all_servers(self, include_inactive: bool = False) -> List[ServerStatus]:
+        """Get all servers, optionally including inactive ones."""
+        session = self.get_session()
+        try:
+            from datetime import timedelta
+            query = session.query(ServerStatus)
+            
+            if not include_inactive:
+                # Only show servers that have been seen in the last 24 hours
+                cutoff_time = datetime.utcnow() - timedelta(hours=24)
+                query = query.filter(ServerStatus.last_seen >= cutoff_time)
+            
+            return query.order_by(desc(ServerStatus.started_at)).all()
+        finally:
+            session.close()
+    
+    def cleanup_old_servers(self, max_age_hours: int = 168) -> int:
+        """Clean up old server entries (default: 1 week)."""
+        session = self.get_session()
+        try:
+            from datetime import timedelta
+            cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
+            
+            deleted_count = session.query(ServerStatus).filter(
+                ServerStatus.last_seen < cutoff_time
+            ).delete()
+            
+            session.commit()
+            return deleted_count
+        finally:
+            session.close()
+    
+    def get_server_stats(self) -> Dict[str, Any]:
+        """Get overall server statistics."""
+        session = self.get_session()
+        try:
+            from datetime import timedelta
+            # Active servers (seen in last 2 minutes)
+            active_cutoff = datetime.utcnow() - timedelta(minutes=2)
+            active_count = session.query(ServerStatus).filter(
+                ServerStatus.last_seen >= active_cutoff
+            ).count()
+            
+            # Recently active servers (seen in last hour)
+            recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+            recent_count = session.query(ServerStatus).filter(
+                ServerStatus.last_seen >= recent_cutoff
+            ).count()
+            
+            # Total requests across all servers
+            total_requests = session.query(func.sum(ServerStatus.total_requests)).scalar() or 0
+            
+            # Average uptime of active servers
+            active_servers = session.query(ServerStatus).filter(
+                ServerStatus.last_seen >= active_cutoff
+            ).all()
+            
+            avg_uptime = 0
+            if active_servers:
+                total_uptime = sum(
+                    (datetime.utcnow() - server.started_at).total_seconds()
+                    for server in active_servers if server.started_at
+                )
+                avg_uptime = total_uptime / len(active_servers)
+            
+            return {
+                'active_servers': active_count,
+                'recent_servers': recent_count,
+                'total_requests_all_servers': total_requests,
+                'average_uptime_seconds': int(avg_uptime),
+                'average_uptime_formatted': self._format_uptime(avg_uptime) if avg_uptime > 0 else '0s'
+            }
+        finally:
+            session.close()
+    
+    def _format_uptime(self, uptime_seconds: float) -> str:
+        """Format uptime in human-readable format."""
+        if uptime_seconds < 60:
+            return f"{int(uptime_seconds)}s"
+        elif uptime_seconds < 3600:
+            minutes = int(uptime_seconds / 60)
+            seconds = int(uptime_seconds % 60)
+            return f"{minutes}m {seconds}s"
+        elif uptime_seconds < 86400:
+            hours = int(uptime_seconds / 3600)
+            minutes = int((uptime_seconds % 3600) / 60)
+            return f"{hours}h {minutes}m"
+        else:
+            days = int(uptime_seconds / 86400)
+            hours = int((uptime_seconds % 86400) / 3600)
+            return f"{days}d {hours}h"

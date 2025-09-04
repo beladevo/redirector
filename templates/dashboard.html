@@ -3,8 +3,133 @@
 {% block content %}
 <!-- Modern Dashboard Application -->
 <div x-data="dashboardApp()" x-init="initialize()" class="space-y-6">
+    
+    <!-- Server Status Section -->
+    <section class="server-status-section" aria-label="Active Servers" data-animate>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-900">
+                🖥️ Active Redirect Servers
+            </h2>
+            <div class="server-header-actions">
+                <div class="text-sm text-gray-600" x-show="serverStats">
+                    <span x-text="serverStats?.active_servers || 0"></span> active servers
+                    <span x-show="serverStats?.active_servers > 0">
+                        • Avg uptime: <span x-text="serverStats?.average_uptime_formatted || 'N/A'"></span>
+                    </span>
+                </div>
+                <button 
+                    @click="refreshServers()"
+                    class="btn btn-outline btn-sm"
+                    title="Refresh server status"
+                    :disabled="loadingServers"
+                >
+                    <div x-show="loadingServers" class="loading-spinner"></div>
+                    <span x-show="!loadingServers">🔄</span>
+                    <span x-text="loadingServers ? 'Loading...' : 'Refresh'"></span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Server Status Cards -->
+        <div class="server-status-grid" x-show="!loadingServers && servers.length > 0">
+            <template x-for="server in servers" :key="server.server_id">
+                <div 
+                    class="server-status-card"
+                    :class="{ 'active': server.is_active, 'inactive': !server.is_active }"
+                >
+                    <div class="server-card-header">
+                        <div class="server-info">
+                            <h3 class="server-id" x-text="server.server_id"></h3>
+                            <div class="server-campaign">
+                                Campaign: <span x-text="server.campaign"></span>
+                            </div>
+                        </div>
+                        <div class="server-status-indicator" :class="{ 'active': server.is_active, 'inactive': !server.is_active }">
+                            <span x-show="server.is_active" class="status-dot active" title="Active">●</span>
+                            <span x-show="!server.is_active" class="status-dot inactive" title="Inactive">●</span>
+                        </div>
+                    </div>
+                    
+                    <div class="server-details">
+                        <div class="server-detail-item">
+                            <span class="detail-label">Host:</span>
+                            <span class="detail-value" x-text="server.host"></span>
+                        </div>
+                        <div class="server-detail-item">
+                            <span class="detail-label">Port:</span>
+                            <span class="detail-value" x-text="server.redirect_port"></span>
+                        </div>
+                        <div class="server-detail-item">
+                            <span class="detail-label">Target:</span>
+                            <span class="detail-value truncate" :title="server.redirect_url" x-text="truncateText(server.redirect_url, 30)"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="server-stats">
+                        <div class="stat-item">
+                            <div class="stat-value" x-text="formatNumber(server.total_requests)"></div>
+                            <div class="stat-label">Requests</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" x-text="server.requests_per_minute"></div>
+                            <div class="stat-label">RPM</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" x-text="server.avg_response_time + 'ms'"></div>
+                            <div class="stat-label">Avg Time</div>
+                        </div>
+                    </div>
+                    
+                    <div class="server-uptime">
+                        <div class="uptime-info">
+                            <span class="uptime-label">Uptime:</span>
+                            <span class="uptime-value" x-text="server.uptime_formatted"></span>
+                        </div>
+                        <div class="last-seen" x-show="!server.is_active">
+                            Last seen: <span x-text="formatRelativeTime(server.last_seen)"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Tunnel Info -->
+                    <div x-show="server.tunnel_enabled" class="server-tunnel-info">
+                        <div class="tunnel-badge">
+                            🌍 Tunnel Enabled
+                        </div>
+                        <div x-show="server.tunnel_url" class="tunnel-url" x-text="server.tunnel_url"></div>
+                    </div>
+                    
+                    <!-- Platform Info -->
+                    <div class="server-platform-info">
+                        <div class="platform-item" x-show="server.platform">
+                            <span x-text="server.platform"></span>
+                        </div>
+                        <div class="platform-item" x-show="server.python_version">
+                            Python <span x-text="server.python_version"></span>
+                        </div>
+                        <div class="platform-item" x-show="server.version">
+                            v<span x-text="server.version"></span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Loading State for Servers -->
+        <div x-show="loadingServers" class="loading-container">
+            <div class="loading-spinner"></div>
+            <span>Loading servers...</span>
+        </div>
+        
+        <!-- Empty State for Servers -->
+        <div x-show="!loadingServers && servers.length === 0" class="empty-state">
+            <div class="text-6xl mb-4">🖥️</div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No active servers</h3>
+            <p class="text-gray-600">Start a redirect server to see it here.</p>
+        </div>
+    </section>
+
     <!-- Campaign Cards Section -->
-    <section class="campaign-cards-section" aria-label="Campaign Overview">
+    <section class="campaign-cards-section" aria-label="Campaign Overview" data-animate>
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-900">
                 📊 Campaign Overview
@@ -17,6 +142,7 @@
                     @click="clearAllLogs()"
                     class="btn btn-danger btn-sm"
                     title="Clear ALL logs from database"
+                    data-action="clear-all"
                 >
                     🗑️ Clear All Logs
                 </button>
@@ -176,7 +302,7 @@
     </div>
 
     <!-- Filters Card -->
-    <div class="card">
+    <div class="card" data-animate>
         <div class="card-header">
             <h2 class="card-title">
                 <span>🔍</span>
@@ -229,6 +355,7 @@
                             @input="debounceFilter()" 
                             placeholder="Filter by IP address..."
                             class="form-input"
+                            data-search
                         >
                     </div>
                     
@@ -300,6 +427,7 @@
                         @click="clearAllFilters()" 
                         :disabled="loading"
                         class="btn btn-outline"
+                        data-clear-filters
                     >
                         <span>🔄</span>
                         <span>Clear Filters</span>
@@ -321,6 +449,7 @@
                         @click="refreshData()" 
                         :disabled="loading"
                         class="btn btn-outline"
+                        data-refresh
                     >
                         <div x-show="loading" class="loading-spinner"></div>
                         <span x-show="!loading">🔄</span>
@@ -338,7 +467,7 @@
     </div>
 
     <!-- Logs Table -->
-    <div x-show="!loading || logs.length > 0" class="card">
+    <div x-show="!loading || logs.length > 0" class="card" data-animate>
         <div class="card-header">
             <div class="flex justify-between items-center w-full">
                 <h2 class="card-title">
@@ -668,6 +797,15 @@ function dashboardApp() {
         /** @type {boolean} Loading state for campaign cards */
         loadingCampaignCards: false,
         
+        /** @type {Array<Object>} Active servers */
+        servers: [],
+        
+        /** @type {Object|null} Server statistics */
+        serverStats: null,
+        
+        /** @type {boolean} Loading state for servers */
+        loadingServers: false,
+        
         /** @type {Object} Dashboard statistics */
         stats: {
             totalRequests: 0,
@@ -889,7 +1027,9 @@ function dashboardApp() {
             try {
                 await Promise.all([
                     this._fetchLogs(),
-                    this._fetchStats()
+                    this._fetchStats(),
+                    this._fetchServers(),
+                    this._fetchServerStats()
                 ]);
                 
                 this.lastUpdated = this.formatTimestamp(new Date().toISOString());
@@ -1004,6 +1144,111 @@ function dashboardApp() {
                     params.append(paramKey, value.trim());
                 }
             });
+        },
+        
+        /**
+         * Fetch server status data
+         * @private
+         */
+        async _fetchServers() {
+            try {
+                const response = await fetch('/api/servers', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const servers = await response.json();
+                this.servers = Array.isArray(servers) ? servers : [];
+                
+                console.info(`🖥️ Fetched ${this.servers.length} servers`);
+            } catch (error) {
+                console.warn('⚠️ Failed to fetch servers:', error);
+                this.servers = []; // Fail gracefully
+            }
+        },
+        
+        /**
+         * Fetch server statistics
+         * @private
+         */
+        async _fetchServerStats() {
+            try {
+                const response = await fetch('/api/servers/stats', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const stats = await response.json();
+                this.serverStats = stats;
+                
+                console.info('📊 Server stats updated:', stats);
+            } catch (error) {
+                console.warn('⚠️ Failed to fetch server stats:', error);
+                this.serverStats = null; // Fail gracefully
+            }
+        },
+        
+        // ==================== SERVER MANAGEMENT ====================
+        
+        /**
+         * Refresh server data
+         */
+        async refreshServers() {
+            this.loadingServers = true;
+            try {
+                await Promise.all([
+                    this._fetchServers(),
+                    this._fetchServerStats()
+                ]);
+                console.info('🔄 Server data refreshed');
+            } catch (error) {
+                this._handleError('Failed to refresh server data', error);
+            } finally {
+                this.loadingServers = false;
+            }
+        },
+        
+        /**
+         * Format relative time (e.g., "5 minutes ago")
+         * @param {string} timestamp - ISO timestamp string
+         * @returns {string} Relative time string
+         */
+        formatRelativeTime(timestamp) {
+            if (!timestamp) return 'Unknown';
+            
+            try {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffSeconds = Math.floor((now - date) / 1000);
+                
+                if (diffSeconds < 60) {
+                    return 'Just now';
+                } else if (diffSeconds < 3600) {
+                    const minutes = Math.floor(diffSeconds / 60);
+                    return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+                } else if (diffSeconds < 86400) {
+                    const hours = Math.floor(diffSeconds / 3600);
+                    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                } else {
+                    const days = Math.floor(diffSeconds / 86400);
+                    return `${days} day${days !== 1 ? 's' : ''} ago`;
+                }
+            } catch (error) {
+                console.warn('Failed to format relative time:', timestamp, error);
+                return 'Unknown';
+            }
         },
         
         // ==================== FILTER MANAGEMENT ====================

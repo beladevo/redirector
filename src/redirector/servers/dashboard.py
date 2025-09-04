@@ -38,14 +38,56 @@ def create_dashboard_app(config: RedirectorConfig) -> FastAPI:
     db_manager = DatabaseManager(config.database_url)
     
     # Mount static files
-    try:
-        app.mount("/static", StaticFiles(directory="static"), name="static")
-    except RuntimeError:
-        # Handle case where static directory doesn't exist
-        pass
+    import os
+    from pathlib import Path
+    
+    # Try different possible static directory locations
+    static_paths = [
+        "static",
+        Path(__file__).parent.parent.parent.parent / "static",
+        Path.cwd() / "static"
+    ]
+    
+    static_mounted = False
+    for static_path in static_paths:
+        if Path(static_path).exists():
+            try:
+                static_files = StaticFiles(directory=str(static_path))
+                app.mount("/static", static_files, name="static")
+                static_mounted = True
+                print(f"[OK] Static files mounted from: {static_path}")
+                break
+            except Exception as e:
+                print(f"[WARN] Failed to mount static from {static_path}: {e}")
+                continue
+    
+    if not static_mounted:
+        print("[ERROR] Warning: No static directory found. CSS and JS files will not be served.")
+        # Create a basic static route fallback
+        @app.get("/static/{file_path:path}")
+        async def static_fallback(file_path: str):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Static file not found: {file_path}")
     
     # Templates
-    templates = Jinja2Templates(directory="templates")
+    template_paths = [
+        "templates",
+        Path(__file__).parent.parent.parent.parent / "templates",
+        Path.cwd() / "templates"
+    ]
+    
+    templates_dir = None
+    for template_path in template_paths:
+        if Path(template_path).exists():
+            templates_dir = str(template_path)
+            print(f"[OK] Templates found at: {template_path}")
+            break
+    
+    if not templates_dir:
+        templates_dir = "templates"  # fallback
+        print(f"[WARN] No templates directory found, using fallback: {templates_dir}")
+    
+    templates = Jinja2Templates(directory=templates_dir)
     
     # Authentication setup
     security = HTTPBasic() if config.dashboard_auth else None
@@ -65,9 +107,6 @@ def create_dashboard_app(config: RedirectorConfig) -> FastAPI:
                 headers={"WWW-Authenticate": "Basic"},
             )
         return credentials.username
-    
-    # Include API routes
-    app.include_router(create_api_router(config, db_manager))
     
     @app.get("/", response_class=HTMLResponse)
     async def dashboard_home(
@@ -130,5 +169,8 @@ def create_dashboard_app(config: RedirectorConfig) -> FastAPI:
     async def health_check() -> dict:
         """Health check endpoint."""
         return {"status": "ok", "service": "dashboard", "campaign": config.campaign}
+    
+    # Include API routes at the end
+    app.include_router(create_api_router(config, db_manager))
     
     return app

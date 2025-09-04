@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from ..core.config import RedirectorConfig
-from ..core.models import DatabaseManager, Campaign, LogEntry
+from ..core.models import DatabaseManager, Campaign, LogEntry, ServerStatus
 
 
 # Pydantic models for API
@@ -84,6 +84,41 @@ class StatsResponse(BaseModel):
     methods: Dict[str, int]
     top_user_agents: Dict[str, int]
     campaign: Optional[str]
+
+
+class ServerStatusResponse(BaseModel):
+    id: int
+    server_id: str
+    campaign: str
+    redirect_url: str
+    redirect_port: int
+    dashboard_port: Optional[int]
+    host: str
+    pid: Optional[int]
+    status: str
+    started_at: str
+    last_seen: str
+    last_request_at: Optional[str]
+    uptime_seconds: int
+    uptime_formatted: str
+    last_seen_seconds: int
+    is_active: bool
+    total_requests: int
+    requests_per_minute: int
+    avg_response_time: int
+    tunnel_enabled: bool
+    tunnel_url: Optional[str]
+    version: Optional[str]
+    python_version: Optional[str]
+    platform: Optional[str]
+
+
+class ServerStatsResponse(BaseModel):
+    active_servers: int
+    recent_servers: int
+    total_requests_all_servers: int
+    average_uptime_seconds: int
+    average_uptime_formatted: str
 
 
 def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> APIRouter:
@@ -456,5 +491,42 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
             raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
         finally:
             session.close()
+    
+    # ==================== SERVER STATUS ENDPOINTS ====================
+    
+    @router.get("/servers", response_model=List[ServerStatusResponse])
+    async def get_servers(
+        campaign: Optional[str] = Query(None, description="Filter by campaign"),
+        include_inactive: bool = Query(False, description="Include inactive servers")
+    ) -> List[ServerStatusResponse]:
+        """Get list of servers."""
+        if campaign:
+            servers = db_manager.get_active_servers(campaign=campaign)
+        else:
+            servers = db_manager.get_all_servers(include_inactive=include_inactive)
+        
+        return [ServerStatusResponse(**server.to_dict()) for server in servers]
+    
+    @router.get("/servers/stats", response_model=ServerStatsResponse)
+    async def get_server_stats() -> ServerStatsResponse:
+        """Get overall server statistics."""
+        stats = db_manager.get_server_stats()
+        return ServerStatsResponse(**stats)
+    
+    @router.post("/servers/cleanup")
+    async def cleanup_old_servers(
+        max_age_hours: int = Query(168, ge=1, description="Maximum age in hours (default: 168 = 1 week)")
+    ) -> Dict[str, Any]:
+        """Clean up old server entries."""
+        try:
+            deleted_count = db_manager.cleanup_old_servers(max_age_hours=max_age_hours)
+            return {
+                "success": True,
+                "message": f"Cleaned up {deleted_count} old server entries",
+                "deleted_count": deleted_count,
+                "max_age_hours": max_age_hours
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to cleanup servers: {str(e)}")
     
     return router

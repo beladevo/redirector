@@ -1,5 +1,10 @@
 """Redirect server implementation."""
 import time
+import os
+import socket
+import uuid
+import atexit
+from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -34,6 +39,86 @@ def create_redirect_app(config: RedirectorConfig) -> FastAPI:
     # Initialize database manager
     db_manager = DatabaseManager(config.database_url)
     
+    # Generate unique server ID
+    server_id = f"redirect-{config.campaign}-{config.redirect_port}-{uuid.uuid4().hex[:8]}"
+    
+    # Get server information
+    hostname = socket.gethostname()
+    pid = os.getpid()
+    
+    # Server statistics tracking
+    server_stats = {
+        'total_requests': 0,
+        'start_time': datetime.utcnow(),
+        'response_times': []
+    }
+    
+    # Register this server instance
+    try:
+        db_manager.register_server(
+            server_id=server_id,
+            campaign=config.campaign,
+            redirect_url=config.redirect_url,
+            redirect_port=config.redirect_port,
+            dashboard_port=getattr(config, 'dashboard_port', None),
+            host=hostname,
+            pid=pid,
+            tunnel_enabled=getattr(config, 'tunnel', False),
+            tunnel_url=getattr(config, 'tunnel_url', None),
+            version="2.0.0"
+        )
+        print(f"[INFO] Server registered with ID: {server_id}")
+    except Exception as e:
+        print(f"[WARN] Failed to register server: {e}")
+    
+    # Set up server cleanup on exit
+    def cleanup_server():
+        try:
+            db_manager.mark_server_inactive(server_id)
+            print(f"[INFO] Server {server_id} marked as inactive")
+        except Exception as e:
+            print(f"[WARN] Failed to mark server inactive: {e}")
+    
+    atexit.register(cleanup_server)
+    
+    # Background task to update server heartbeat
+    import asyncio
+    async def heartbeat_task():
+        """Update server heartbeat every 30 seconds."""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                
+                # Calculate requests per minute
+                current_time = datetime.utcnow()
+                time_diff = (current_time - server_stats['start_time']).total_seconds() / 60
+                rpm = int(server_stats['total_requests'] / time_diff) if time_diff > 0 else 0
+                
+                # Calculate average response time
+                avg_response_time = 0
+                if server_stats['response_times']:
+                    avg_response_time = int(sum(server_stats['response_times']) / len(server_stats['response_times']))
+                    # Keep only last 100 response times to prevent memory bloat
+                    if len(server_stats['response_times']) > 100:
+                        server_stats['response_times'] = server_stats['response_times'][-100:]
+                
+                # Update server status
+                db_manager.update_server_heartbeat(
+                    server_id=server_id,
+                    total_requests=server_stats['total_requests'],
+                    requests_per_minute=rpm,
+                    avg_response_time=avg_response_time,
+                    last_request_at=server_stats.get('last_request_time')
+                )
+                
+            except Exception as e:
+                print(f"[WARN] Heartbeat update failed: {e}")
+    
+    # Start heartbeat task
+    @app.on_event("startup")
+    async def startup_event():
+        asyncio.create_task(heartbeat_task())
+    
     @app.middleware("http")
     async def log_and_redirect(request: Request, call_next: Any) -> RedirectResponse:
         """Log request and redirect to target URL."""
@@ -61,6 +146,11 @@ def create_redirect_app(config: RedirectorConfig) -> FastAPI:
             # Calculate response time
             response_time_ms = int((time.time() - start_time) * 1000)
             log_entry.response_time_ms = response_time_ms
+            
+            # Update server statistics
+            server_stats['total_requests'] += 1
+            server_stats['response_times'].append(response_time_ms)
+            server_stats['last_request_time'] = datetime.utcnow()
             
             # Store in database
             session = db_manager.get_session()
