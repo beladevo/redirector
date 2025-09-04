@@ -6,108 +6,57 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/)
 
-## 📋 About
+## ⚡ Quick Start (30 seconds)
 
-**Redirector** is a powerful, developer-friendly tool for URL redirection with comprehensive tracking and analytics. Perfect for developers, marketers, researchers, and anyone who needs detailed insights into web traffic patterns.
-
-### ✅ Use Cases
-- **Development & Testing** - Mock external service redirects, test integrations
-- **Marketing Analytics** - Track campaign performance and user behavior
-- **Research Projects** - Analyze web traffic patterns and user interactions
-- **Educational Purposes** - Learn about HTTP redirects and web analytics
-- **API Testing** - Monitor and log HTTP requests for debugging
-- **Load Testing** - Track performance under various conditions
-
-**Use this tool responsibly and in accordance with applicable laws and regulations.**
-
----
-
-## 🚀 Features
-
-### Core Functionality
-- **Campaign-based tracking** - Organize redirects by named campaigns
-- **Comprehensive logging** - Track IP, User-Agent, headers, timing, and more
-- **Professional dashboard** - Beautiful, responsive UI with real-time updates
-- **Powerful filtering** - Search by campaign, time range, IP, method, path
-- **Export capabilities** - CSV and JSONL export with filtering
-- **RESTful API** - Programmatic access to all data
-- **Cloudflare tunnel** - One-click public exposure via cloudflared
-
-### Security & Production Ready
-- **Authentication support** - Optional basic auth for dashboard
-- **Docker support** - Production-ready containerization
-- **Non-root execution** - Security-first Docker configuration
-- **Rate limiting** - Built-in protection against abuse
-- **Sensitive data filtering** - Automatic filtering of auth headers
-- **Configurable body storage** - Optional request body logging for lab use
-
-### Developer Experience
-- **Rich CLI** - Beautiful terminal interface with helpful banners
-- **Configuration files** - YAML-based configuration management
-- **Hot reloading** - Development-friendly auto-refresh
-- **Comprehensive tests** - Unit and integration test coverage
-- **Type hints** - Full typing support for better IDE experience
-- **Pre-commit hooks** - Automated code quality checks
-
----
-
-## 📦 Quick Start
-
-### One-liner with Docker
+### Install & Run
 
 ```bash
-# Basic redirect
+# Install
+pip install redirector
+
+# Run (redirects to your target URL)
+redirector run --redirect https://your-target.com
+
+# View dashboard at http://localhost:3000
+```
+
+### Docker (One-liner)
+
+```bash
 docker run -p 8080:8080 -p 3000:3000 redirector:latest
-
-# With custom target and campaign
-docker run -p 8080:8080 -p 3000:3000 \
-  redirector:latest redirector run \
-  --redirect https://your-target.com \
-  --campaign my-operation
-
-# With authentication and tunnel
-docker run -p 8080:8080 -p 3000:3000 \
-  redirector:latest redirector run \
-  --redirect https://your-target.com \
-  --campaign secure-test \
-  --dashboard-auth admin:secret123 \
-  --tunnel
 ```
 
-### One-liner with pip
+## ✨ What it does
 
-```bash
-# Install and run
-pip install redirector && \
-redirector run --redirect https://your-target.com --campaign quick-test
-```
+- **Redirects** all traffic to your target URL
+- **Logs** every request (IP, User-Agent, headers, etc.)  
+- **Dashboard** to view all logged requests
+- **Export** data as CSV/JSON
 
----
+Perfect for tracking marketing campaigns, testing, or analyzing traffic patterns.
 
-## 🛠️ Installation
+![Demo GIF](docs/demo.gif)
 
-### Option 1: pip (Recommended)
+## 🔧 Installation
+
+### Method 1: pip (easiest)
 
 ```bash
 pip install redirector
 ```
 
-### Option 2: From Source
+### Method 2: Docker
+
+```bash
+docker run -p 8080:8080 -p 3000:3000 redirector:latest
+```
+
+### Method 3: From source
 
 ```bash
 git clone https://github.com/beladevo/redirector.git
 cd redirector
-pip install -e .
-```
-
-### Option 3: Docker
-
-```bash
-# Build
-docker build -t redirector:latest .
-
-# Or use docker-compose
-docker-compose up --build
+pip install .
 ```
 
 ---
