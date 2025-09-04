@@ -1,5 +1,7 @@
 # Redirector 🎯
 
+![Redirector Logo](docs/redirector.png)
+
 **A flexible request logger and redirector with campaign tracking, analytics, and tunnel support**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
