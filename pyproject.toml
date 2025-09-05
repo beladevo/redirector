@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "redirector"
+name = "redirector-osint"
 version = "2.0.0"
 description = "Professional OSINT tool for URL redirection with comprehensive request logging, IP tracking, and user-agent analysis"
 readme = "README.md"

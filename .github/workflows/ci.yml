@@ -10,18 +10,17 @@ on:
 
 jobs:
   docker:
-    name: Docker Build & Test (quick)
+    name: Docker Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build single-platform for speed and load it locally for tests
-      - name: Build (amd64) with cache
+      - name: Build and test
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -31,40 +30,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run container smoke test
+      - name: Quick smoke test
         run: |
-          docker run --rm -d --name test-redirector -p 8080:8080 -p 3000:3000 redirector:test
-          for i in {1..12}; do
-            if curl -fsS http://localhost:3000/health >/dev/null; then
-              echo "Container is ready!"
-              break
-            fi
-            echo "Waiting for container... ($i/12)"
-            sleep 5
-          done
-          curl -fsS http://localhost:3000/health >/dev/null || (docker logs test-redirector && exit 1)
+          docker run --rm -d --name test-redirector -p 3000:3000 redirector:test
+          sleep 8
+          curl -f http://localhost:3000/health || (docker logs test-redirector && exit 1)
           docker stop test-redirector
 
   build-and-publish:
-    name: Build & Publish (main/release)
+    name: Build & Publish
     runs-on: ubuntu-latest
     needs: [docker]
     if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      # Build Python package (kept minimal; caches pip implicitly on runner)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Build & check package
+      - name: Build Python package
         run: |
-          python -m pip install --upgrade pip
           pip install build twine
           python -m build
           twine check dist/*
@@ -92,14 +80,10 @@ jobs:
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/redirector
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      # Multi-platform only on main/release (keeps PRs blazing fast)
-      - name: Build and push (cached, multi-platform)
+      - name: Build and push Docker
         uses: docker/build-push-action@v5
         with:
           context: .

@@ -31,7 +31,7 @@ class RedirectorConfig:
     tunnel_url: Optional[str] = None  # Set dynamically when tunnel starts
     
     # Runtime settings
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     log_level: str = "info"
     
     # Security settings
@@ -131,7 +131,7 @@ database_path: logs.db
 tunnel: false
 
 # Runtime settings
-host: 0.0.0.0
+host: 127.0.0.1
 log_level: info
 
 # Security settings

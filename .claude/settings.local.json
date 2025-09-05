@@ -2,7 +2,26 @@
   "permissions": {
     "allow": [
       "Bash(python:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Bash(docker build:*)",
+      "Bash(powershell:*)",
+      "Bash(timeout:*)",
+      "Bash(docker:*)",
+      "Read(/E:\\repos\\redirector\\src\\redirector\\cli/**)",
+      "Read(/E:\\repos\\redirector\\src/**)",
+      "Bash(curl:*)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Read(/E:\\repos\\redirector/**)",
+      "Bash(dir:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(gh release create:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
