@@ -593,6 +593,7 @@ class DatabaseManager:
         version: Optional[str] = None
     ) -> None:
         """Register or update a server in the status table."""
+        print(f"[DEBUG] Registering server: {server_id}, campaign: {campaign}, host: {host}:{redirect_port}")
         session = self.get_session()
         try:
             # Check if server already exists
@@ -601,6 +602,7 @@ class DatabaseManager:
             ).first()
             
             if existing_server:
+                print(f"[DEBUG] Updating existing server: {server_id}")
                 # Update existing server
                 existing_server.campaign = campaign
                 existing_server.redirect_url = redirect_url
@@ -614,6 +616,7 @@ class DatabaseManager:
                 existing_server.tunnel_url = tunnel_url
                 existing_server.version = version
             else:
+                print(f"[DEBUG] Creating new server entry: {server_id}")
                 # Create new server entry
                 import platform
                 import sys
@@ -638,6 +641,26 @@ class DatabaseManager:
                 session.add(server)
             
             session.commit()
+            print(f"[DEBUG] Successfully registered/updated server: {server_id}")
+            
+            # Verify the server was saved
+            try:
+                saved_server = session.query(ServerStatus).filter(
+                    ServerStatus.server_id == server_id
+                ).first()
+                if saved_server:
+                    print(f"[DEBUG] Verification: Server {server_id} exists in database")
+                else:
+                    print(f"[ERROR] Verification failed: Server {server_id} NOT found in database after save")
+            except Exception as verify_error:
+                print(f"[ERROR] Verification check failed: {verify_error}")
+                
+        except Exception as e:
+            print(f"[ERROR] Failed to register server {server_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            session.rollback()
+            raise
         finally:
             session.close()
     
@@ -713,12 +736,20 @@ class DatabaseManager:
             from datetime import timedelta
             query = session.query(ServerStatus)
             
+            total_servers = query.count()
+            print(f"[DEBUG] Total servers in database: {total_servers}")
+            
             if not include_inactive:
                 # Only show servers that have been seen in the last 24 hours
                 cutoff_time = datetime.utcnow() - timedelta(hours=24)
+                print(f"[DEBUG] Cutoff time for active servers: {cutoff_time}")
                 query = query.filter(ServerStatus.last_seen >= cutoff_time)
+                active_servers_count = query.count()
+                print(f"[DEBUG] Servers active within 24h: {active_servers_count}")
             
-            return query.order_by(desc(ServerStatus.started_at)).all()
+            result = query.order_by(desc(ServerStatus.started_at)).all()
+            print(f"[DEBUG] Returning {len(result)} servers from get_all_servers")
+            return result
         finally:
             session.close()
     

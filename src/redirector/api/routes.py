@@ -539,12 +539,26 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
         include_inactive: bool = Query(False, description="Include inactive servers")
     ) -> List[ServerStatusResponse]:
         """Get list of servers."""
-        if campaign:
-            servers = db_manager.get_active_servers(campaign=campaign)
-        else:
-            servers = db_manager.get_all_servers(include_inactive=include_inactive)
-        
-        return [ServerStatusResponse(**server.to_dict()) for server in servers]
+        try:
+            if campaign:
+                servers = db_manager.get_active_servers(campaign=campaign)
+                print(f"[DEBUG] Found {len(servers)} active servers for campaign '{campaign}'")
+            else:
+                servers = db_manager.get_all_servers(include_inactive=include_inactive)
+                print(f"[DEBUG] Found {len(servers)} total servers (include_inactive={include_inactive})")
+            
+            # Debug each server
+            for server in servers:
+                print(f"[DEBUG] Server {server.server_id}: campaign={server.campaign}, status={server.status}, last_seen={server.last_seen}")
+            
+            result = [ServerStatusResponse(**server.to_dict()) for server in servers]
+            print(f"[DEBUG] Returning {len(result)} server responses")
+            return result
+        except Exception as e:
+            print(f"[ERROR] Failed to get servers: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Failed to get servers: {str(e)}")
     
     @router.get("/servers/stats", response_model=ServerStatsResponse)
     async def get_server_stats() -> ServerStatsResponse:
@@ -567,5 +581,39 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to cleanup servers: {str(e)}")
+
+    @router.post("/servers/test-register")
+    async def test_register_server(
+        campaign: str = Query("test-campaign", description="Campaign name"),
+        redirect_url: str = Query("https://example.com", description="Redirect URL"),
+        port: int = Query(8080, description="Server port")
+    ) -> Dict[str, Any]:
+        """Debug endpoint to manually register a test server."""
+        try:
+            import uuid
+            server_id = f"test-{uuid.uuid4().hex[:8]}"
+            
+            db_manager.register_server(
+                server_id=server_id,
+                campaign=campaign,
+                redirect_url=redirect_url,
+                redirect_port=port,
+                host="localhost",
+                version="debug-2.0.0"
+            )
+            
+            return {
+                "success": True,
+                "message": f"Test server registered successfully",
+                "server_id": server_id,
+                "campaign": campaign,
+                "redirect_url": redirect_url,
+                "redirect_port": port
+            }
+        except Exception as e:
+            print(f"[ERROR] Failed to register test server: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Failed to register test server: {str(e)}")
     
     return router

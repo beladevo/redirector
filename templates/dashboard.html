@@ -17,16 +17,26 @@
                         • Avg uptime: <span x-text="serverStats?.average_uptime_formatted || 'N/A'"></span>
                     </span>
                 </div>
-                <button 
-                    @click="refreshServers()"
-                    class="btn btn-outline btn-sm"
-                    title="Refresh server status"
-                    :disabled="loadingServers"
-                >
-                    <div x-show="loadingServers" class="loading-spinner"></div>
-                    <span x-show="!loadingServers">🔄</span>
-                    <span x-text="loadingServers ? 'Loading...' : 'Refresh'"></span>
-                </button>
+                <div class="flex gap-2">
+                    <button 
+                        @click="testRegisterServer()"
+                        class="btn btn-outline btn-sm"
+                        title="Register a test server for debugging"
+                        :disabled="loadingServers"
+                    >
+                        🧪 Test Server
+                    </button>
+                    <button 
+                        @click="refreshServers()"
+                        class="btn btn-outline btn-sm"
+                        title="Refresh server status"
+                        :disabled="loadingServers"
+                    >
+                        <div x-show="loadingServers" class="loading-spinner"></div>
+                        <span x-show="!loadingServers">🔄</span>
+                        <span x-text="loadingServers ? 'Loading...' : 'Refresh'"></span>
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -123,8 +133,12 @@
         <!-- Empty State for Servers -->
         <div x-show="!loadingServers && servers.length === 0" class="empty-state">
             <div class="text-6xl mb-4">🖥️</div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">No active servers</h3>
-            <p class="text-gray-600">Start a redirect server to see it here.</p>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No servers found</h3>
+            <p class="text-gray-600 mb-4">Start a redirect server using the CLI to see it here:</p>
+            <div class="bg-gray-100 p-4 rounded-lg font-mono text-sm text-left max-w-lg mx-auto">
+                <div class="text-gray-800">python redirector.py run --redirect "https://example.com"</div>
+                <div class="text-gray-600 text-xs mt-2">Server status will appear here once registered</div>
+            </div>
         </div>
     </section>
 
@@ -1163,7 +1177,8 @@ function dashboardApp() {
          */
         async _fetchServers() {
             try {
-                const response = await fetch('/api/servers', {
+                // Include inactive servers by default to show all server history
+                const response = await fetch('/api/servers?include_inactive=true', {
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
@@ -1177,9 +1192,10 @@ function dashboardApp() {
                 const servers = await response.json();
                 this.servers = Array.isArray(servers) ? servers : [];
                 
-                console.info(`🖥️ Fetched ${this.servers.length} servers`);
+                console.info(`🖥️ Fetched ${this.servers.length} servers (including inactive)`);
             } catch (error) {
                 console.warn('⚠️ Failed to fetch servers:', error);
+                console.error('Server fetch error details:', error);
                 this.servers = []; // Fail gracefully
             }
         },
@@ -1228,6 +1244,35 @@ function dashboardApp() {
                 this._handleError('Failed to refresh server data', error);
             } finally {
                 this.loadingServers = false;
+            }
+        },
+
+        /**
+         * Register a test server for debugging
+         */
+        async testRegisterServer() {
+            try {
+                const response = await fetch('/api/servers/test-register', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                this.showSuccessMessage(`Test server registered: ${result.server_id}`);
+                
+                // Refresh server data to show the new test server
+                await this.refreshServers();
+                
+                console.info('🧪 Test server registered successfully:', result);
+            } catch (error) {
+                this._handleError('Failed to register test server', error);
             }
         },
         
