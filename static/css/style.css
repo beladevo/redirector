@@ -397,9 +397,20 @@ pre code {
     background: rgba(255, 255, 255, 0.2);
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-full);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Campaign badges in tables (light mode) */
+.table .campaign-badge {
+    background: var(--primary-100);
+    color: var(--primary-800);
+    border: 1px solid var(--primary-300);
+    backdrop-filter: none;
+    text-shadow: none;
 }
 
 .dashboard-main {
@@ -1260,19 +1271,20 @@ pre code {
    DARK MODE SUPPORT
    ========================================================================== */
 
+[data-theme="dark"],
 @media (prefers-color-scheme: dark) {
     :root {
         /* Dark mode color overrides */
-        --gray-50: var(--gray-900);
-        --gray-100: var(--gray-800);
-        --gray-200: var(--gray-700);
-        --gray-300: var(--gray-600);
-        --gray-400: var(--gray-500);
-        --gray-500: var(--gray-400);
-        --gray-600: var(--gray-300);
-        --gray-700: var(--gray-200);
-        --gray-800: var(--gray-100);
-        --gray-900: var(--gray-50);
+        --gray-50: #0f172a;
+        --gray-100: #1e293b;
+        --gray-200: #334155;
+        --gray-300: #475569;
+        --gray-400: #64748b;
+        --gray-500: #94a3b8;
+        --gray-600: #cbd5e1;
+        --gray-700: #e2e8f0;
+        --gray-800: #f1f5f9;
+        --gray-900: #f8fafc;
     }
     
     body {
@@ -1284,15 +1296,36 @@ pre code {
     .stat-card,
     .campaign-card,
     .modal-content {
-        background: var(--gray-900);
-        border-color: var(--gray-700);
+        background: var(--gray-800);
+        border-color: var(--gray-600);
+        color: var(--gray-100);
+    }
+    
+    .card-header {
+        background: var(--gray-700);
+        border-color: var(--gray-600);
+    }
+    
+    .card-title,
+    .campaign-card-title,
+    .server-info h3.server-id {
+        color: var(--gray-100);
+    }
+    
+    .campaign-card-description,
+    .server-campaign {
+        color: var(--gray-300);
     }
     
     .form-input,
     .form-select {
-        background: var(--gray-800);
-        border-color: var(--gray-600);
+        background: var(--gray-700);
+        border-color: var(--gray-500);
         color: var(--gray-100);
+    }
+    
+    .form-label {
+        color: var(--gray-200);
     }
     
     .logo-container {
@@ -1302,6 +1335,128 @@ pre code {
     
     .brand-text {
         color: var(--gray-100);
+    }
+    
+    /* Campaign badges with better contrast in dark mode */
+    .campaign-badge {
+        background: rgba(59, 130, 246, 0.3);
+        color: var(--primary-100);
+        border: 1px solid rgba(59, 130, 246, 0.5);
+        font-weight: var(--font-weight-semibold);
+    }
+    
+    /* Campaign card badges in tables */
+    .table .campaign-badge {
+        background: var(--primary-900);
+        color: var(--primary-200);
+        border: 1px solid var(--primary-700);
+    }
+    
+    /* Table styling for dark mode */
+    .table {
+        color: var(--gray-100);
+    }
+    
+    .table th {
+        background: var(--gray-700);
+        color: var(--gray-100);
+        border-color: var(--gray-600);
+    }
+    
+    .table td {
+        border-color: var(--gray-600);
+    }
+    
+    .table tbody tr:hover {
+        background: var(--gray-700);
+    }
+    
+    /* Method badges dark mode improvements */
+    .method-get { 
+        background: rgba(34, 197, 94, 0.2); 
+        color: var(--success-300);
+        border: 1px solid var(--success-600);
+    }
+
+    .method-post { 
+        background: rgba(245, 158, 11, 0.2); 
+        color: var(--warning-300);
+        border: 1px solid var(--warning-600);
+    }
+
+    .method-put { 
+        background: rgba(6, 182, 212, 0.2); 
+        color: var(--info-300);
+        border: 1px solid var(--info-600);
+    }
+
+    .method-delete { 
+        background: rgba(239, 68, 68, 0.2); 
+        color: var(--error-300);
+        border: 1px solid var(--error-600);
+    }
+
+    .method-patch { 
+        background: rgba(59, 130, 246, 0.2); 
+        color: var(--primary-300);
+        border: 1px solid var(--primary-600);
+    }
+
+    .method-head,
+    .method-options { 
+        background: rgba(148, 163, 184, 0.2); 
+        color: var(--gray-300);
+        border: 1px solid var(--gray-500);
+    }
+
+    .method-unknown { 
+        background: rgba(107, 114, 128, 0.2); 
+        color: var(--gray-400);
+        border: 1px solid var(--gray-600);
+    }
+    
+    /* Server status cards dark mode */
+    .server-status-card {
+        background: var(--gray-800);
+        border-color: var(--gray-600);
+        color: var(--gray-100);
+    }
+    
+    .server-details {
+        background: var(--gray-700);
+        border-color: var(--gray-600);
+    }
+    
+    .detail-label {
+        color: var(--gray-300);
+    }
+    
+    .detail-value {
+        color: var(--gray-100);
+    }
+    
+    /* Status indicators */
+    .stat-item {
+        background: var(--gray-700);
+        border-color: var(--gray-600);
+    }
+    
+    .stat-label {
+        color: var(--gray-300);
+    }
+    
+    /* Platform info */
+    .platform-item {
+        background: var(--gray-700);
+        color: var(--gray-200);
+        border-color: var(--gray-600);
+    }
+    
+    /* Modal styling */
+    .modal-header,
+    .modal-footer {
+        background: var(--gray-700);
+        border-color: var(--gray-600);
     }
 }
 

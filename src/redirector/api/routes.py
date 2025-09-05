@@ -491,6 +491,45 @@ def create_api_router(config: RedirectorConfig, db_manager: DatabaseManager) -> 
             raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
         finally:
             session.close()
+
+    @router.delete("/campaigns")
+    async def delete_all_campaigns() -> Dict[str, Any]:
+        """Delete all campaigns and their associated logs."""
+        session = db_manager.get_session()
+        try:
+            # Get count of campaigns to delete
+            campaigns_count = session.query(Campaign).count()
+            
+            if campaigns_count == 0:
+                return {
+                    "success": True,
+                    "message": "No campaigns to delete",
+                    "campaigns_deleted": 0,
+                    "logs_deleted": 0
+                }
+            
+            # Get total logs count before deletion
+            logs_count = session.query(LogEntry).count()
+            
+            # Delete all logs first (they reference campaigns)
+            session.query(LogEntry).delete()
+            
+            # Delete all campaigns
+            session.query(Campaign).delete()
+            
+            session.commit()
+            
+            return {
+                "success": True,
+                "message": f"Deleted {campaigns_count} campaigns and {logs_count} associated logs",
+                "campaigns_deleted": campaigns_count,
+                "logs_deleted": logs_count
+            }
+        except Exception as e:
+            session.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to delete all campaigns: {str(e)}")
+        finally:
+            session.close()
     
     # ==================== SERVER STATUS ENDPOINTS ====================
     

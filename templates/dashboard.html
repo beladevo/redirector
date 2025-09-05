@@ -138,14 +138,25 @@
                 <div class="text-sm text-gray-600" x-show="campaignCards.length > 0">
                     Showing <span x-text="campaignCards.length"></span> of <span x-text="campaignCardsPagination.totalItems"></span> campaigns
                 </div>
-                <button 
-                    @click="clearAllLogs()"
-                    class="btn btn-danger btn-sm"
-                    title="Clear ALL logs from database"
-                    data-action="clear-all"
-                >
-                    🗑️ Clear All Logs
-                </button>
+                <div class="flex gap-2">
+                    <button 
+                        @click="clearAllLogs()"
+                        class="btn btn-danger btn-sm"
+                        title="Clear ALL logs from database"
+                        data-action="clear-all"
+                    >
+                        🗑️ Clear All Logs
+                    </button>
+                    <button 
+                        @click="deleteAllCampaigns()"
+                        class="btn btn-danger btn-sm"
+                        title="Delete ALL campaigns and their logs"
+                        data-action="delete-all-campaigns"
+                        :disabled="campaignCards.length === 0"
+                    >
+                        ❌ Remove All Campaigns
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -2122,6 +2133,51 @@ function dashboardApp() {
                         
                     } catch (error) {
                         this._handleError('Failed to delete campaign', error);
+                    }
+                }
+            });
+        },
+
+        /**
+         * Delete all campaigns and their logs
+         */
+        async deleteAllCampaigns() {
+            this.showConfirmModal({
+                title: 'Delete ALL Campaigns',
+                message: `Are you sure you want to DELETE ALL CAMPAIGNS? This will permanently delete ALL campaigns and ALL associated logs from the database. This action cannot be undone.`,
+                icon: '🗑️',
+                type: 'danger',
+                confirmText: 'Delete All Campaigns',
+                onConfirm: async () => {
+                    try {
+                        const response = await fetch('/api/campaigns', {
+                            method: 'DELETE',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+
+                        const result = await response.json();
+                        
+                        // Show success message
+                        this._showSuccessMessage(result.message);
+                        
+                        // Clear any active campaign filter
+                        this.filters.campaign = '';
+                        
+                        // Refresh data
+                        await this.loadInitialData();
+                        await this.loadCampaignCards();
+                        
+                        console.info(`✅ ${result.message}`);
+                        
+                    } catch (error) {
+                        this._handleError('Failed to delete all campaigns', error);
                     }
                 }
             });
