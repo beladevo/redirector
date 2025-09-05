@@ -14,7 +14,7 @@
 
 ```bash
 # Install
-pip install redirector
+pip install redirector-osint
 
 # Run (redirects to your target URL)
 redirector run --redirect https://your-target.com
@@ -39,14 +39,16 @@ docker run -p 8080:8080 -p 3000:3000 redirector:latest
 
 Perfect for tracking marketing campaigns, testing, or analyzing traffic patterns.
 
+<!-- GIF Placeholder: Overview demo showing complete workflow -->
 ![Demo GIF](docs/demo.gif)
+*Demo GIF should show: Installing via pip, running redirector command, accessing dashboard, viewing logged requests, and exporting data - complete 30-second workflow*
 
 ## 🔧 Installation
 
 ### Method 1: pip (easiest)
 
 ```bash
-pip install redirector
+pip install redirector-osint
 ```
 
 ### Method 2: Docker
@@ -70,6 +72,10 @@ pip install .
 ## 💻 Usage
 
 ### Basic Usage
+
+<!-- GIF Placeholder: Basic usage demonstration -->
+![Basic Usage GIF](docs/basic-usage.gif)
+*Basic Usage GIF should show: Running simple redirect command, testing redirect in browser, viewing logged request in dashboard*
 
 ```bash
 # Simple redirect
@@ -145,6 +151,10 @@ redirector run \
 ---
 
 ## 📊 Dashboard Features
+
+<!-- GIF Placeholder: Dashboard features demonstration -->
+![Dashboard Features GIF](docs/dashboard-features.gif)
+*Dashboard Features GIF should show: Opening dashboard, filtering requests by campaign, viewing request details modal, exporting data as CSV, switching between beautiful and raw modes*
 
 ### Beautiful UI Mode (Default)
 - **Real-time updates** - Auto-refresh every 10 seconds
@@ -232,6 +242,10 @@ with open("export.csv", "wb") as f:
 
 ## 🐳 Docker Deployment
 
+<!-- GIF Placeholder: Docker deployment demonstration -->
+![Docker Deployment GIF](docs/docker-deployment.gif)
+*Docker Deployment GIF should show: Running docker command, container starting up, accessing both redirect and dashboard ports, viewing logs in docker logs*
+
 ### Basic Deployment
 
 ```yaml
@@ -291,6 +305,10 @@ volumes:
 ---
 
 ## 🧪 Development
+
+<!-- GIF Placeholder: Development setup demonstration -->
+![Development Setup GIF](docs/development-setup.gif)
+*Development Setup GIF should show: Cloning repository, running make dev, running make run, making code changes, running make check, tests passing*
 
 ### Setup Development Environment
 
