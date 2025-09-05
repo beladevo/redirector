@@ -91,6 +91,11 @@ def run(
         "--log-level",
         help="Log level (debug, info, warning, error)"
     ),
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Host to bind servers to (use 0.0.0.0 for Docker)"
+    ),
     accept_security_notice: bool = typer.Option(
         False,
         "--accept-security-notice", "-y",
@@ -130,6 +135,7 @@ def run(
             store_body=store_body,
             tunnel=tunnel,
             database_path=database_path,
+            host=host,
             log_level=log_level
         )
         

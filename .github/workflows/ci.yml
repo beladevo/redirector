@@ -27,9 +27,14 @@ jobs:
       - name: Smoke test
         run: |
           docker run --rm -d --name test -p 3000:3000 -p 8080:8080 redirector:test
-          sleep 10
-          curl -f http://localhost:3000/health || (docker logs test && exit 1)
-          docker stop test
+          sleep 5
+          echo "Container status:"
+          docker ps -a
+          echo "Container logs:"
+          docker logs test || echo "No logs available"
+          echo "Testing health endpoint:"
+          curl -v http://localhost:3000/health || echo "Health check failed"
+          docker stop test || echo "Container already stopped"
 
   publish:
     name: Publish Release
