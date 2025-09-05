@@ -26,8 +26,10 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test
         run: |
-          docker run --rm -d --name test -p 3000:3000 redirector:test
-          sleep 5 && curl -f http://localhost:3000/health && docker stop test
+          docker run --rm -d --name test -p 3000:3000 -p 8080:8080 redirector:test
+          sleep 10
+          curl -f http://localhost:3000/health || (docker logs test && exit 1)
+          docker stop test
 
   publish:
     name: Publish Release
