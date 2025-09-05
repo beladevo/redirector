@@ -1458,6 +1458,19 @@ pre code {
         background: var(--gray-700);
         border-color: var(--gray-600);
     }
+    
+    /* Fix heading visibility in dark mode */
+    h1, h2, h3, h4, h5, h6,
+    .text-gray-900 {
+        color: var(--gray-100) !important;
+    }
+    
+    /* Specific fixes for dashboard headings */
+    .text-2xl.font-bold.text-gray-900,
+    .text-lg.font-semibold.text-gray-900,
+    .font-semibold.text-gray-900 {
+        color: var(--gray-100) !important;
+    }
 }
 
 /* ==========================================================================

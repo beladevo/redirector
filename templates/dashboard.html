@@ -93,7 +93,7 @@
                     <div class="server-uptime">
                         <div class="uptime-info">
                             <span class="uptime-label">Uptime:</span>
-                            <span class="uptime-value" x-text="server.uptime_formatted"></span>
+                            <span class="uptime-value" x-text="getRealTimeUptime(server)"></span>
                         </div>
                         <div class="last-seen" x-show="!server.is_active">
                             Last seen: <span x-text="formatRelativeTime(server.last_seen)"></span>
@@ -858,6 +858,9 @@ function dashboardApp() {
         /** @type {string|null} Last update timestamp */
         lastUpdated: null,
         
+        /** @type {number} Current time for uptime calculations (updates every second) */
+        currentTime: Date.now(),
+        
         /** @type {Object} Confirmation modal state */
         confirmModal: {
             show: false,
@@ -910,6 +913,13 @@ function dashboardApp() {
             timerId: null
         },
         
+        /** @type {Object} Real-time uptime timer */
+        uptimeTimer: {
+            enabled: true,
+            interval: 1000, // 1 second for uptime updates
+            timerId: null
+        },
+        
         // ==================== REAL-TIME UPDATES ====================
         
         /** @type {Object} Real-time update configuration */
@@ -956,6 +966,11 @@ function dashboardApp() {
                 // Start auto refresh if enabled (fallback for WebSocket failures)
                 if (this.autoRefresh.enabled) {
                     this._startAutoRefresh();
+                }
+                
+                // Start uptime timer for real-time updates
+                if (this.uptimeTimer.enabled) {
+                    this._startUptimeTimer();
                 }
                 
                 console.info('✅ Dashboard initialized successfully');
@@ -1307,6 +1322,51 @@ function dashboardApp() {
             }
         },
         
+        /**
+         * Get real-time uptime for a server (updates every second)
+         * @param {Object} server - Server object
+         * @returns {string} Real-time formatted uptime
+         */
+        getRealTimeUptime(server) {
+            if (!server || !server.started_at) return 'N/A';
+            
+            try {
+                const startTime = new Date(server.started_at);
+                // Use reactive currentTime to trigger updates
+                const now = new Date(this.currentTime);
+                const uptimeSeconds = Math.floor((now - startTime) / 1000);
+                
+                return this._formatUptime(uptimeSeconds);
+            } catch (error) {
+                console.warn('Failed to calculate real-time uptime:', error);
+                return server.uptime_formatted || 'N/A';
+            }
+        },
+        
+        /**
+         * Format uptime in human-readable format
+         * @private
+         * @param {number} uptimeSeconds - Uptime in seconds
+         * @returns {string} Formatted uptime
+         */
+        _formatUptime(uptimeSeconds) {
+            if (uptimeSeconds < 60) {
+                return `${uptimeSeconds}s`;
+            } else if (uptimeSeconds < 3600) {
+                const minutes = Math.floor(uptimeSeconds / 60);
+                const seconds = uptimeSeconds % 60;
+                return `${minutes}m ${seconds}s`;
+            } else if (uptimeSeconds < 86400) {
+                const hours = Math.floor(uptimeSeconds / 3600);
+                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                return `${hours}h ${minutes}m`;
+            } else {
+                const days = Math.floor(uptimeSeconds / 86400);
+                const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+                return `${days}d ${hours}h`;
+            }
+        },
+        
         // ==================== FILTER MANAGEMENT ====================
         
         /**
@@ -1490,6 +1550,34 @@ function dashboardApp() {
             if (this.autoRefresh.timerId) {
                 clearInterval(this.autoRefresh.timerId);
                 this.autoRefresh.timerId = null;
+            }
+        },
+        
+        // ==================== UPTIME TIMER ====================
+        
+        /**
+         * Start uptime timer for real-time uptime updates
+         * @private
+         */
+        _startUptimeTimer() {
+            this._stopUptimeTimer(); // Clear any existing timer
+            
+            if (!this.uptimeTimer.enabled) return;
+            
+            this.uptimeTimer.timerId = setInterval(() => {
+                // Update current time to trigger reactivity in uptime calculations
+                this.currentTime = Date.now();
+            }, this.uptimeTimer.interval);
+        },
+        
+        /**
+         * Stop uptime timer
+         * @private
+         */
+        _stopUptimeTimer() {
+            if (this.uptimeTimer.timerId) {
+                clearInterval(this.uptimeTimer.timerId);
+                this.uptimeTimer.timerId = null;
             }
         },
         
@@ -2010,6 +2098,7 @@ function dashboardApp() {
             console.info('🧹 Cleaning up dashboard resources');
             
             this._pauseAutoRefresh();
+            this._stopUptimeTimer();
             this._stopWebSocketHeartbeat();
             
             // Close WebSocket connection
