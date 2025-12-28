@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     apk add --no-cache --virtual .build-deps gcc musl-dev && \
-    pip install --no-deps -r requirements.txt && \
+    pip install -r requirements.txt && \
     apk del .build-deps && \
     adduser -D -s /bin/sh redirector
 
