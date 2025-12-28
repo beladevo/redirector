@@ -5,6 +5,7 @@ services:
     build: .
     container_name: redirector-app
     restart: unless-stopped
+    user: "0:0"  # Run as root to avoid permission issues with volumes
     ports:
       - "8080:8080"  # Redirect server
       - "3000:3000"  # Dashboard
@@ -17,12 +18,14 @@ services:
       - ./data:/app/data  # Persist database
       - ./logs:/app/logs  # Persist logs
     command: >
-      python -m redirector.cli.main run
+      run
       --redirect https://example.com
       --redirect-port 8080
       --dashboard-port 3000
+      --host 0.0.0.0
       --campaign docker-demo
       --database /app/data/logs.db
+      --tunnel
       --accept-security-notice
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
